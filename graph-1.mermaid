@@ -1,0 +1,30 @@
+sequenceDiagram
+ Participant GH as GitHub
+ Participant U as User
+ Participant CA as Compromised 3rd Party App
+ Participant BA as Bad Actor doing Compromise
+ Participant PR as Public Repo
+ Participant SR as Sensitive Repo
+
+note over U,SR: Initial state: uninfected User with commit access to both repositories.
+
+note over U: Use cool tool on Public Repo
+U -->>CA: OAuth login
+CA->>+BA: non-expiring OAuth token
+note over BA: Unauthorized Access Obtained
+Note over U: Account Owned
+opt Normal User <-> Repo usage, mediated by App, is normal
+    U -->> CA: 
+    CA -->>PR:  
+    PR -->>CA: 
+    CA -->>U: 
+end
+U -->>CA: Logout (does not revoke token)
+
+note over U,SR: Attack at any later time
+BA ->> SR: Commit as User via API
+note over SR: Integrity Compromised
+
+U -->>GH: Delete token via UI
+BA -->>-BA: access lost
+note over BA: Unauthorized Access Lost
