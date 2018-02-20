@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# use `jq` to extract relevant data
+set -eu
+
+INPUT=${1:-${INPUT:-protections.json}}
+TMP=${TMP:-${TEMP:-/tmp}}
+
+tmpDir=$(mktemp -d $TMP/${0##*/}-$USER-XXXXXX)
+tmp_file="$tmpDir/input"
+# save where we can reuse
+cat "$INPUT" >$tmp_file
+
+echo '"Repository","Protected Branch Count","Production Branch","Compliance"'
+echo ""
+echo "Projects with default branch protected per guidance:"
+jq --raw-output <"$tmp_file" \
+    'select(.default_protected==true) 
+    |  [.repository, .protected_branch_count, .default_branch, "good" ]
+    | @csv ' 
+
+echo ""
+echo "Repositories with non-default branch(es) protected:"
+jq --raw-output <"$tmp_file" \
+    'select(.default_protected==false and .protected_branch_count>=1) 
+    |  [.repository, .protected_branch_count, .default_branch, "maybe" ]
+    | @csv ' 
+
+echo ""
+echo "Repositories with no branch protection:"
+jq --raw-output <"$tmp_file" \
+    'select(.default_protected==false and .protections.enabled==false) 
+    |  [.repository, .protected_branch_count, .default_branch, "nope" ]
+    | @csv ' 
+
+rm -rf "$tmpDir"
