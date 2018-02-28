@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "f3dea123093eb1466016fe8469e4f6301b183f2158c0f934218435d8a2b0d7e0"
+            "sha256": "0e54803dddf6ef0c4dae14c9c78b5c9eb612b872da4f0edaac9239207a58ad40"
         },
         "host-environment-markers": {
             "implementation_name": "cpython",
@@ -29,6 +29,12 @@
         ]
     },
     "default": {
+        "agithub": {
+            "hashes": [
+                "sha256:92b736276efc232c78e4f1705458a5bd82397d3035af31dba13141129fddd413"
+            ],
+            "version": "==2.1"
+        },
         "certifi": {
             "hashes": [
                 "sha256:14131608ad2fd56836d33a71ee60fa1c82bc9d2c8d98b7bdbc631fe1b3cd1296",

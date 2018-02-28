@@ -14,8 +14,13 @@ echo '"Repository","Protected Branch Count","Production Branch","Compliance"'
 echo ""
 echo "Projects with default branch protected per guidance:"
 jq --raw-output <"$tmp_file" \
-    'select(.default_protected==true) 
-    |  [.repository, .protected_branch_count, .default_branch, "good" ]
+    'to_entries[] | select(.key | contains("/")) |
+select(.value.default_protected)
+    |  [.key, .value.protected_branch_count, .value.default_branch, "good" ]
+    | @csv ' 
+jq --raw-output <"$tmp_file" \
+    '.| [ keys[] as $k | select(.[$k].default_protected==true) 
+    |  [.repository, .protected_branch_count, .default_branch, "good" ] ]
     | @csv ' 
 
 echo ""
