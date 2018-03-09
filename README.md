@@ -23,5 +23,6 @@ These checks can be automated, if a PAT token is available.
   org appear to have multiple deployed credentials.
 
 - ``check_branch_protections.py`` to extract the information about
-  protected branches. Outputs JSON file, which ``protection_report`` can
-  summarize to csv. Import that into a spreadsheet, and play.
+  protected branches. Outputs JSON file, which
+  ``report_branch_status.py`` can summarize to csv. Import that into a
+  spreadsheet, and play.
