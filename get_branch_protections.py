@@ -12,8 +12,7 @@ import logging  # noqa: E402
 import os  # noqa: E402
 import time  # noqa: E402
 from agithub.GitHub import GitHub  # noqa: E402
-# import github3  # noqa: E402
-# import tinydb
+import tinydb  # noqa: E402
 
 DEBUG = False
 CREDENTIALS_FILE = '.credentials'
@@ -23,16 +22,70 @@ class AG_Exception(Exception):
     pass
 
 
-def ag_call(func, *args, expected_rc=None, **kwargs):
+# TinyDB utility functions
+def db_setup(org_name):
+    ''' HACK
+    setup db per org as org_name.db
+    setup global queries into it
+    '''
+    db = tinydb.TinyDB('{}.db.json'.format(org_name))
+    global last_table
+    last_table = db.table("last_table")
+    return db
+
+
+def db_teardown(db):
+    global last_table
+    last_table = None
+    global branch_results
+    branch_results = None
+    db.close()
+
+
+def update_or_insert(table, key, key_value, payload):
+    updated_docs = table.update(payload, tinydb.where(key) == key_value)
+    if not updated_docs:
+        # not in, so insert
+        table.insert(payload)
+
+
+# agithub utility functions
+def ag_call(func, *args, expected_rc=None, new_only=True, headers=None,
+            **kwargs):
     """
     Wrap AGitHub calls with basic error detection.
 
     Not smart, and hides any error information from caller.
     But very convenient. :)
     """
+    if not headers:
+        headers = {}
+    last = {}
+    url = func.keywords['url']
+    if new_only and last_table is not None:
+        try:
+            last = last_table.search(tinydb.where('url') == url)[0]['when']
+        except IndexError:
+            pass
+        # prefer last modified, as more readable, but neither guaranteed
+        # https://developer.github.com/v3/#conditional-requests
+        if 'last-modified' in last:
+            headers['If-Modified-Since'] = last['last-modified']
+        elif 'etag' in last:
+            headers['If-None-Match'] = last['etag']
+        real_headers = kwargs.setdefault('headers', {})
+        real_headers.update(headers)
+
     if expected_rc is None:
-        expected_rc = [200, ]
+        expected_rc = [200, 304, ]
     rc, body = func(*args, **kwargs)
+    if new_only and last_table is not None:
+        h = {k.lower(): v for k, v in gh.getheaders()}
+        for x in 'etag', 'last-modified':
+            if x in h:
+                last[x] = h[x]
+        update_or_insert(last_table, 'url', url, {'url': url, 'when': last})
+
     if rc not in expected_rc:
         if DEBUG:
             import pudb; pudb.set_trace()  # noqa: E702
@@ -59,8 +112,9 @@ def ag_get_all(func, *orig_args, **orig_kwargs):
                 yield elem
         else:
             break
-        # fix up to get next page
+        # fix up to get next page, without changing query set
         kwargs["page"] += 1
+        kwargs['new_only'] = False
 
 
 def get_github_client():
@@ -114,7 +168,10 @@ Pseudo_code = """
 """
 
 
+# SHH, globals, don't tell anyone
 gh = None
+last_table = None
+branch_results = None
 
 
 def harvest_repo(repo):
@@ -133,6 +190,9 @@ def harvest_repo(repo):
     # if repo is empty, branch retrieval will fail with 404
     try:
         branch = ag_call(gh.repos[full_name].branches[default_branch].get)
+        if not branch:
+            # no changes since last time
+            return {}
         logger.debug("Raw data for %s: %s", default_branch,
                      json.dumps(branch, indent=2))
         protection = ag_call(gh.repos[full_name]
@@ -154,6 +214,8 @@ def harvest_repo(repo):
             "protections": protection or None,
             "signatures": signatures or None,
         })
+        update_or_insert(branch_results, 'repo', full_name,
+                         {'repo': full_name, 'branch': details})
     except AG_Exception:
         # Assume no branch so add no data
         pass
@@ -165,6 +227,9 @@ def harvest_org(org_name):
     org_data = {}
     try:
         org = ag_call(gh.orgs[org_name].get)
+        if not org:
+            # org data not modified, early exit
+            return org_data
     except AG_Exception:
         logger.error("No such org '%s'", org_name)
         return org_data
@@ -175,21 +240,34 @@ def harvest_org(org_name):
     return org_data
 
 
-def process_orgs(args=None):
+def process_orgs(args=None, collected_as=None):
     logger.info("Gathering branch protection data."
                 " (calls remaining %s).", ratelimit_remaining())
     if not args:
         args = {}
+    if not collected_as:
+        collected_as = '<unknown>'
     results = {}
     for org in args.org:
-        wait_for_ratelimit()
-        if args.repo:
-            logger.info("Only processing repo %s", args.repo)
-            repo = ag_call(gh.repos[org][args.repo].get)
-            org_data = harvest_repo(repo)
-        else:
-            org_data = harvest_org(org)
-        results.update(org_data)
+        try:
+            db = db_setup(org)
+            global branch_results
+            branch_results = db.table('branch_results')
+            wait_for_ratelimit()
+            if args.repo:
+                logger.info("Only processing repo %s", args.repo)
+                repo = ag_call(gh.repos[org][args.repo].get)
+                org_data = harvest_repo(repo)
+            else:
+                org_data = harvest_org(org)
+            results.update(org_data)
+        finally:
+            meta_data = {
+                "collected_as": collected_as,
+                "collected_at": time.time(),
+            }
+            db.table('collection_data').insert({'meta': meta_data})
+            db_teardown(db)
     logger.info("Finshed gathering branch protection data"
                 " (calls remaining %s).", ratelimit_remaining())
     return results
@@ -203,13 +281,14 @@ def main(driver=None):
     body = ag_call(gh.user.get)
     collected_as = body["login"]
     logger.info("Running as {}".format(collected_as))
-    data = process_orgs(args)
+    data = process_orgs(args, collected_as=collected_as)
     results = {
         "collected_as": collected_as,
         "collected_at": time.time(),
     }
     results.update(data)
-    print(json.dumps(results, indent=2))
+    if args.print:
+        print(json.dumps(results, indent=2))
 
 
 def parse_args():
@@ -219,6 +298,8 @@ def parse_args():
                         nargs='*')
     parser.add_argument('--repo', help='Only check for this repo')
     parser.add_argument('--debug', help='Enter pdb on problem',
+                        action='store_true')
+    parser.add_argument('--print', help='print huge json mess',
                         action='store_true')
     args = parser.parse_args()
     global DEBUG
