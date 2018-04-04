@@ -3,6 +3,12 @@ PATH_TO_FOXSEC := ../foxsec
 PATH_TO_METADATA := services/metadata
 TMP_DIR := .cache
 
+REPO_JSON_FILES = $(wildcard *.db.json)
+REPO_STATUS_FILES := $(REPO_JSON_FILES:.json=.json.csv)
+
+%.db.json.csv: %.db.json
+	./report_branch_status.py $< >$@
+
 help:
 	@echo "services: get/update data from metadata"
 	@echo "clean: purge stuff"
@@ -24,12 +30,9 @@ $(TMP_DIR)/services.json: $(PATH_TO_FOXSEC)/$(PATH_TO_METADATA)
 	> $@
 
 
-$(TMP_DIR)/repos_used_by_service.json: $(TMP_DIR)/services.json all_repo_results.combined.csv
-	# turn the url into an owner/repository string,
-	# with trailing ',' for better grep results
-	# until
-	./extract_service_results.py $(TMP_DIR)/services.json all_repo_results.combined.csv >$@
+$(TMP_DIR)/repos_used_by_service.csv: $(TMP_DIR)/services.json ${REPO_STATUS_FILES}
+	./extract_service_results.py --services $(TMP_DIR)/services.json ${REPO_STATUS_FILES} >$@
 
-services: $(TMP_DIR)/repos_used_by_service.json
+services: $(TMP_DIR)/repos_used_by_service.csv
 
 .PHONY: services clean
