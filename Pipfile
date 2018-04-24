@@ -1,0 +1,23 @@
+[[source]]
+
+url = "https://pypi.python.org/simple"
+name = "pypi"
+verify_ssl = true
+
+
+[packages]
+
+selenium = "*"
+requests = "*"
+"github3-py" = ">=1.0a4"
+github_selenium = {git = "https://github.com/mozilla/GitHub_Selenium.git"}
+
+
+[dev-packages]
+
+pudb = "*"
+
+
+[requires]
+
+python_version = "3.6"
