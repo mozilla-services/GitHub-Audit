@@ -64,6 +64,7 @@ def ag_call(func, *args, expected_rc=None, new_only=True, headers=None,
     url = func.keywords['url']
     if new_only and last_table is not None:
         try:
+            # TODO: need to grab most recent (sort desc by when)
             last = last_table.search(tinydb.where('url') == url)[0]['when']
         except IndexError:
             pass
@@ -79,6 +80,21 @@ def ag_call(func, *args, expected_rc=None, new_only=True, headers=None,
     if expected_rc is None:
         expected_rc = [200, 304, ]
     rc, body = func(*args, **kwargs)
+    # Handle repo rename/removal corner cases
+    if rc == 301:
+        logger.error("Permanent Redirect for '{}'".format(url))
+        # TODO: do something better, like switch to using id's
+        # for now, act like nothing is there
+        return []
+    elif rc == 404 and rc not in expected_rc:
+        logger.error("No longer found: {}".format(url))
+        # TODO: Figure out what to do here. Maybe it's just that message, but
+        # maybe need to delete from DB before next run
+        return []
+    if rc == 304:
+        logger.debug("304 for {}".format(url))
+    else:
+        logger.debug("{} for {}".format(rc, url))
     if new_only and last_table is not None:
         h = {k.lower(): v for k, v in gh.getheaders()}
         for x in 'etag', 'last-modified':
@@ -115,6 +131,17 @@ def ag_get_all(func, *orig_args, **orig_kwargs):
         # fix up to get next page, without changing query set
         kwargs["page"] += 1
         kwargs['new_only'] = False
+
+
+# JSON support routines
+class BytesEncoder(json.JSONEncoder):
+    # When reading from the database, an empty value will sometimes be returned
+    # as an empty bytes array. Convert to empty string.
+    def default(self, obj):
+        if isinstance(obj, bytes):
+            if not bool(obj):
+                return ''
+        return self.super(obj)
 
 
 def get_github_client():
@@ -190,30 +217,45 @@ def harvest_repo(repo):
     # if repo is empty, branch retrieval will fail with 404
     try:
         branch = ag_call(gh.repos[full_name].branches[default_branch].get)
-        if not branch:
-            # no changes since last time
-            return {}
+        # Yechity
+        # branches are almost always updated, since they contain the latest
+        # commit information. However, branch protection data may not be
+        # updated, and we want to keep those values from last time.
+        # Which means we always have to read the old record, and use the values
+        # from there - without overwriting the current data.
+        # TODO: normalize to not aggregating data
+        # no changes since last time
+        logger.debug("Getting payload from db")
+        record = branch_results.get(tinydb.where('repo') == full_name)
+        if branch:
+            fresh_details = details
+            details = record['branch']
+            details.update(fresh_details)
+        # always look deeper
         logger.debug("Raw data for %s: %s", default_branch,
-                     json.dumps(branch, indent=2))
+                     json.dumps(branch, indent=2, cls=BytesEncoder))
         protection = ag_call(gh.repos[full_name]
                              .branches[default_branch].protection.get,
-                             expected_rc=[200, 404])
+                             expected_rc=[200, 304, 404])
         logger.debug("Protection data for %s: %s", default_branch,
-                     json.dumps(protection, indent=2))
+                     json.dumps(protection, indent=2, cls=BytesEncoder))
         signatures = ag_call(gh.repos[full_name]
                              .branches[default_branch]
                              .protection.required_signatures.get,
                              headers={"Accept":
                                       "application/vnd.github"
                                       ".zzzax-preview+json"},
-                             expected_rc=[200, 404])
+                             expected_rc=[200, 304, 404])
         logger.debug("Signature data for %s: %s", default_branch,
-                     json.dumps(signatures, indent=2))
-        details.update({
-            "default_protected": bool(branch["protected"]),
-            "protections": protection or None,
-            "signatures": signatures or None,
-        })
+                     json.dumps(signatures, indent=2, cls=BytesEncoder))
+        # the subfields might not have had changes, so don't blindly update
+        if branch:
+            details.update({"default_protected":
+                           bool(branch["protected"])})
+        if protection:
+            details.update({"protections": protection})
+        if signatures:
+            details.update({"signatures": signatures})
         update_or_insert(branch_results, 'repo', full_name,
                          {'repo': full_name, 'branch': details})
     except AG_Exception:
@@ -223,18 +265,28 @@ def harvest_repo(repo):
 
 
 def harvest_org(org_name):
+    def repo_fetcher():
+        if org:
+            logger.debug("Using API for repos")
+            for repo in ag_get_all(gh.orgs[org["login"]].repos.get):
+                yield repo
+                wait_for_ratelimit()
+        else:
+            logger.debug("Using DB for repos")
+            query = tinydb.Query()
+            for db_doc in branch_results.search(query.branch.owner.login == org_name):
+                repo = db_doc['branch']
+                repo['full_name'] = db_doc['repo']
+                yield repo
+
     logger.debug("Working on org '%s'", org_name)
     org_data = {}
     try:
         org = ag_call(gh.orgs[org_name].get)
-        if not org:
-            # org data not modified, early exit
-            return org_data
     except AG_Exception:
         logger.error("No such org '%s'", org_name)
         return org_data
-    for repo in ag_get_all(gh.orgs[org["login"]].repos.get):
-        wait_for_ratelimit()
+    for repo in repo_fetcher():
         repo_data = harvest_repo(repo)
         org_data.update(repo_data)
     return org_data
@@ -288,7 +340,7 @@ def main(driver=None):
     }
     results.update(data)
     if args.print:
-        print(json.dumps(results, indent=2))
+        print(json.dumps(results, indent=2, cls=BytesEncoder))
 
 
 def parse_args():
