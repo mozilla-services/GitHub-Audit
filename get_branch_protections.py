@@ -49,6 +49,11 @@ def update_or_insert(table, key, key_value, payload):
         table.insert(payload)
 
 
+def equals_as_lowercase(db_value, key):
+    # Do case insensitive test
+    return db_value.lower() == key.lower()
+
+
 # agithub utility functions
 def ag_call(func, *args, expected_rc=None, new_only=True, headers=None,
             **kwargs):
@@ -87,7 +92,7 @@ def ag_call(func, *args, expected_rc=None, new_only=True, headers=None,
         # for now, act like nothing is there
         return []
     elif rc == 404 and rc not in expected_rc:
-        logger.error("No longer found: {}".format(url))
+        logger.error("No longer available or access denied: {}".format(url))
         # TODO: Figure out what to do here. Maybe it's just that message, but
         # maybe need to delete from DB before next run
         return []
@@ -227,9 +232,9 @@ def harvest_repo(repo):
         # no changes since last time
         logger.debug("Getting payload from db")
         record = branch_results.get(tinydb.where('repo') == full_name)
-        if branch:
+        if branch and record:
             fresh_details = details
-            details = record['branch']
+            details = record.get('branch', {})
             details.update(fresh_details)
         # always look deeper
         logger.debug("Raw data for %s: %s", default_branch,
@@ -268,15 +273,16 @@ def harvest_org(org_name):
     def repo_fetcher():
         if org:
             logger.debug("Using API for repos")
-            for repo in ag_get_all(gh.orgs[org["login"]].repos.get):
+            for repo in ag_get_all(gh.orgs[org_name].repos.get):
                 yield repo
                 wait_for_ratelimit()
         else:
             logger.debug("Using DB for repos")
             query = tinydb.Query()
-            for db_doc in branch_results.search(query.branch.owner.login == org_name):
+            for db_doc in branch_results.search(query.branch.owner.login.test(equals_as_lowercase, org_name)):
                 repo = db_doc['branch']
                 repo['full_name'] = db_doc['repo']
+                logger.debug("DB Repo: {}".format(db_doc['repo']))
                 yield repo
 
     logger.debug("Working on org '%s'", org_name)
