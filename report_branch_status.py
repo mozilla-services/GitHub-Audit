@@ -3,7 +3,19 @@
     Report on branches that don't match protection guidelines from local json
     data.
 """
-_epilog = """
+import argparse
+import collections
+import csv
+import json
+import logging
+import os
+import re
+import sys
+import time
+
+import tinydb
+
+_help_epilog = """
 Currently checks for the following checkboxes to be enabled on the default
 branch:
     Protect this branch
@@ -11,16 +23,6 @@ branch:
     Require signed commits
     Include Administrators
 """
-import argparse  # noqa: E402
-import collections  # noqa: E402
-import csv  # noqa: E402
-import json  # noqa: E402
-import logging  # noqa: E402
-import os  # noqa: E402
-import sys  # noqa: E402
-import time  # noqa: E402
-# import tinydb  # noqa: E402
-
 DEBUG = False
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,7 @@ Repo = collections.namedtuple('Repo', "name protected restricted enforcement"
                               " signed team_used".split())
 
 
-def report_repos(repo_dict):
+def collect_status(gh, repo_doc):
     def get_nested(eventual_obj, *keys, default=None):
         for key in keys:
             try:
@@ -44,49 +46,81 @@ def report_repos(repo_dict):
                 eventual_obj = default
         return eventual_obj
 
-    report = []
-    for name, info in ((k, v) for k, v in repo_dict.items() if '/' in k):
-        protected = get_nested(info, "default_protected", default=False)
-        # protections apply to admins
-        enforcement = get_nested(info, "protections", "enforce_admins",
-                                 "enabled", default=False)
-        # limit commits to default
-        num_teams = len(get_nested(info, "protections", "restrictions",
-                                   "teams", default=[]))
-        num_users = len(get_nested(info, "protections", "restrictions",
-                                   "users", default=[]))
-        limited_commits = bool(num_teams + num_users > 0)
-        # commits signed
-        signing_required = get_nested(info, "signatures", "enabled",
-                                      default=False)
-        # prefer team restrictions
-        team_preferred = num_teams > 0 and num_users == 0
-        repo = Repo(name, protected, limited_commits, enforcement,
-                    signing_required, team_preferred)
-        report.append(repo)
+    q = tinydb.Query()
+    repo_url = repo_doc['url']
+    default_branch = repo_doc['body']['default_branch']
+    branch_url = f"{repo_url}/branches/{default_branch}"
+    name = get_nested(repo_doc, 'body', 'full_name')
+
+    branch_doc = gh.get(q.url.matches(branch_url))
+    protected = get_nested(branch_doc, 'body', 'protected', default=False)
+
+    # rest come from protection response
+    protection_url = f"{branch_url}/protection"
+    protection_doc = gh.get(q.url.matches(protection_url))
+    # protections apply to admins
+    enforcement = get_nested(protection_doc, 'body', "enforce_admins",
+                                "enabled", default=False)
+    # limit commits to default
+    num_teams = len(get_nested(protection_doc, 'body', "restrictions",
+                                "teams", default=[]))
+    num_users = len(get_nested(protection_doc, 'body', "restrictions",
+                                "users", default=[]))
+    limited_commits = bool(num_teams + num_users > 0)
+
+    # commits signed comes from signature doc
+    sig_url = f"{protection_url}/required_signatures"
+    sig_doc = gh.get(q.url.matches(sig_url))
+    signing_required = get_nested(sig_doc, 'body', "enabled",
+                                    default=False)
+    # prefer team restrictions
+    team_preferred = num_teams > 0 and num_users == 0
+    repo = Repo(name, protected, limited_commits, enforcement,
+                signing_required, team_preferred)
+    return repo
+
+
+def report_repos(report):
     writer = csv.writer(sys.stdout)
     writer.writerow(Repo._fields)
     writer.writerows(report)
-    # print(report)
+
+
+def of_interest(repo_document):
+    return True
+
+
+def get_repos(table):
+    """
+    Generator for all repository documents in table
+
+    yields document for repo URL query
+    """
+    repo_pat = r'^/repos/[^/]+/[^/]+$'
+    q = tinydb.Query()
+    for el in table.search(q.url.matches(repo_pat)):
+        yield el
 
 
 def main(driver=None):
     args = parse_args()
-    repos = json.loads(args.infile.read())
-    if 'branch_results' in repos:
-        # tinydb file, hack for now
-        br = repos['branch_results']
-        repos = {v["repo"]: v["branch"] for v in br.values()}
-        # print(repos)
-    report_repos(repos)
+    repo_status = []
+    with tinydb.TinyDB(args.infile[0].name) as db:
+        gh = db.table('GitHub')
+        for repo in get_repos(gh):
+            if of_interest(repo):
+                status = collect_status(gh, repo)
+                repo_status.append(status)
+
+    report_repos(repo_status)
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__, epilog=_epilog)
+    parser = argparse.ArgumentParser(description=__doc__, epilog=_help_epilog)
     parser.add_argument('--debug', help='Enter pdb on problem',
                         action='store_true')
     parser.add_argument("infile", help="input json file",
-                        type=argparse.FileType(), nargs="?", default=sys.stdin)
+                        type=argparse.FileType(), nargs=1, default=sys.stdin)
     args = parser.parse_args()
     global DEBUG
     DEBUG = args.debug

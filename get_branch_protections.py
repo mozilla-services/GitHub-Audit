@@ -30,15 +30,13 @@ def db_setup(org_name):
     '''
     db = tinydb.TinyDB('{}.db.json'.format(org_name))
     global last_table
-    last_table = db.table("last_table")
+    last_table = db.table("GitHub")
     return db
 
 
 def db_teardown(db):
     global last_table
     last_table = None
-    global branch_results
-    branch_results = None
     db.close()
 
 
@@ -54,22 +52,34 @@ def equals_as_lowercase(db_value, key):
     return db_value.lower() == key.lower()
 
 
+def add_media_types(headers):
+    """
+    Add in the media type to get node_ids (v4) returned
+    """
+    if 'Accept' in headers:
+        headers['Accept'] += ', application/vnd.github.jean-grey-preview+json'
+    else:
+        headers['Accept'] = 'application/vnd.github.jean-grey-preview+json'
+
+
 # agithub utility functions
 def ag_call(func, *args, expected_rc=None, new_only=True, headers=None,
+            no_cache=False,
             **kwargs):
     """
-    Wrap AGitHub calls with basic error detection.
+    Wrap AGitHub calls with basic error detection and caching in TingDB
 
     Not smart, and hides any error information from caller.
     But very convenient. :)
     """
     if not headers:
         headers = {}
+    add_media_types(headers)
     last = {}
     url = func.keywords['url']
+    doc = {'url': url}
     if new_only and last_table is not None:
         try:
-            # TODO: need to grab most recent (sort desc by when)
             last = last_table.search(tinydb.where('url') == url)[0]['when']
         except IndexError:
             pass
@@ -79,33 +89,47 @@ def ag_call(func, *args, expected_rc=None, new_only=True, headers=None,
             headers['If-Modified-Since'] = last['last-modified']
         elif 'etag' in last:
             headers['If-None-Match'] = last['etag']
-        real_headers = kwargs.setdefault('headers', {})
-        real_headers.update(headers)
+    # Insert our (possibly modified) headers
+    real_headers = kwargs.setdefault('headers', {})
+    real_headers.update(headers)
 
     if expected_rc is None:
         expected_rc = [200, 304, ]
     rc, body = func(*args, **kwargs)
+    # If we have new information, we want to use it (and store it unless
+    # no_cache is true)
+    # If we are told our existing info is ok, or there's an error, use the
+    # stored info
+    if rc == 200:
+        doc['rc'] = rc
+        doc['body'] = body
+    elif rc == 304:
+        body = doc.get('body', [])
     # Handle repo rename/removal corner cases
-    if rc == 301:
+    elif rc == 301:
         logger.error("Permanent Redirect for '{}'".format(url))
         # TODO: do something better, like switch to using id's
         # for now, act like nothing is there
-        return []
+        body = doc.get('body', [])
     elif rc == 404 and rc not in expected_rc:
         logger.error("No longer available or access denied: {}".format(url))
         # TODO: Figure out what to do here. Maybe it's just that message, but
         # maybe need to delete from DB before next run
-        return []
-    if rc == 304:
-        logger.debug("304 for {}".format(url))
-    else:
-        logger.debug("{} for {}".format(rc, url))
-    if new_only and last_table is not None:
+        body = doc.get('body', [])
+        # don't throw on this one
+        expected_rc.append(404)
+    logger.debug("{} for {}".format(rc, url))
+    if (not no_cache) and new_only and last_table is not None:
         h = {k.lower(): v for k, v in gh.getheaders()}
         for x in 'etag', 'last-modified':
             if x in h:
                 last[x] = h[x]
-        update_or_insert(last_table, 'url', url, {'url': url, 'when': last})
+        doc.update({
+            'body': body,
+            'rc': rc,
+            'when': last,
+        })
+        last_table.upsert(doc, tinydb.where('url') == url)
 
     if rc not in expected_rc:
         if DEBUG:
@@ -133,6 +157,14 @@ def ag_get_all(func, *orig_args, **orig_kwargs):
                 yield elem
         else:
             break
+        # We don't expect to need to get multiple pages for items we cache in
+        # the db (we don't handle that). So holler if it appears to be that
+        # way, even if only one page is returned.
+        if not orig_kwargs.get('no_cache', False):
+            logger.error("Logic error: multi page query with db cache"
+                         " url: '{}', page {}".format(func.keywords['url'],
+                                                      kwargs["page"]))
+
         # fix up to get next page, without changing query set
         kwargs["page"] += 1
         kwargs['new_only'] = False
@@ -166,7 +198,7 @@ def get_github_client():
 
 def ratelimit_dict():
     #  return gh.ratelimit_remaining
-    body = ag_call(gh.rate_limit.get)
+    body = ag_call(gh.rate_limit.get, no_cache=True)
     return body
 
 
@@ -177,7 +209,7 @@ def ratelimit_remaining():
 
 def wait_for_ratelimit(min_karma=25, msg=None):
     while gh:
-        payload = ag_call(gh.rate_limit.get)
+        payload = ag_call(gh.rate_limit.get, no_cache=True)
         if payload["resources"]["core"]["remaining"] < min_karma:
             core = payload['resources']['core']
             now = time.time()
@@ -203,7 +235,6 @@ Pseudo_code = """
 # SHH, globals, don't tell anyone
 gh = None
 last_table = None
-branch_results = None
 
 
 def harvest_repo(repo):
@@ -212,7 +243,7 @@ def harvest_repo(repo):
     owner = repo["owner"]
     default_branch = repo["default_branch"]
     protected_count = len(list(ag_get_all(gh.repos[full_name].branches.get,
-                                          protected='true')))
+                                          protected='true', no_cache=True)))
     details = {
         "owner": owner,
         "name": name,
@@ -231,7 +262,7 @@ def harvest_repo(repo):
         # TODO: normalize to not aggregating data
         # no changes since last time
         logger.debug("Getting payload from db")
-        record = branch_results.get(tinydb.where('repo') == full_name)
+        record = None  # branch_results.get(tinydb.where('repo') == full_name)
         if branch and record:
             fresh_details = details
             details = record.get('branch', {})
@@ -261,8 +292,8 @@ def harvest_repo(repo):
             details.update({"protections": protection})
         if signatures:
             details.update({"signatures": signatures})
-        update_or_insert(branch_results, 'repo', full_name,
-                         {'repo': full_name, 'branch': details})
+        # update_or_insert(branch_results, 'repo', full_name,
+        #                  {'repo': full_name, 'branch': details})
     except AG_Exception:
         # Assume no branch so add no data
         pass
@@ -271,19 +302,21 @@ def harvest_repo(repo):
 
 def harvest_org(org_name):
     def repo_fetcher():
-        if org:
+        if True:  # org:
             logger.debug("Using API for repos")
-            for repo in ag_get_all(gh.orgs[org_name].repos.get):
+            for repo in ag_get_all(gh.orgs[org_name].repos.get, no_cache=True):
+                # hack - we can't cache on get_all, so redo repo query here
+                ag_call(gh.repos[repo['full_name']].get)
                 yield repo
                 wait_for_ratelimit()
-        else:
-            logger.debug("Using DB for repos")
-            query = tinydb.Query()
-            for db_doc in branch_results.search(query.branch.owner.login.test(equals_as_lowercase, org_name)):
-                repo = db_doc['branch']
-                repo['full_name'] = db_doc['repo']
-                logger.debug("DB Repo: {}".format(db_doc['repo']))
-                yield repo
+        # else:
+        #     logger.debug("Using DB for repos")
+        #     query = tinydb.Query()
+        #     for db_doc in branch_results.search(query.branch.owner.login.test(equals_as_lowercase, org_name)):
+        #         repo = db_doc['branch']
+        #         repo['full_name'] = db_doc['repo']
+        #         logger.debug("DB Repo: {}".format(db_doc['repo']))
+        #         yield repo
 
     logger.debug("Working on org '%s'", org_name)
     org_data = {}
@@ -309,9 +342,9 @@ def process_orgs(args=None, collected_as=None):
     for org in args.org:
         try:
             db = db_setup(org)
-            global branch_results
-            branch_results = db.table('branch_results')
-            wait_for_ratelimit()
+            # global branch_results
+            # branch_results = db.table('branch_results')
+            # wait_for_ratelimit()
             if args.repo:
                 logger.info("Only processing repo %s", args.repo)
                 repo = ag_call(gh.repos[org][args.repo].get)
