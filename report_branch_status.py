@@ -37,15 +37,16 @@ Repo = collections.namedtuple('Repo', "name protected restricted enforcement"
                               " signed team_used".split())
 
 
-def collect_status(gh, repo_doc):
-    def get_nested(eventual_obj, *keys, default=None):
-        for key in keys:
-            try:
-                eventual_obj = eventual_obj[key]
-            except (KeyError, TypeError):
-                eventual_obj = default
-        return eventual_obj
+def get_nested(eventual_obj, *keys, default=None):
+    for key in keys:
+        try:
+            eventual_obj = eventual_obj[key]
+        except (KeyError, TypeError):
+            eventual_obj = default
+    return eventual_obj
 
+
+def collect_status(gh, repo_doc):
     q = tinydb.Query()
     repo_url = repo_doc['url']
     default_branch = repo_doc['body']['default_branch']
@@ -80,14 +81,19 @@ def collect_status(gh, repo_doc):
     return repo
 
 
-def report_repos(report):
+def report_repos(args, report_lines):
     writer = csv.writer(sys.stdout)
-    writer.writerow(Repo._fields)
-    writer.writerows(report)
+    if args.header:
+        writer.writerow(Repo._fields)
+    writer.writerows(report_lines)
 
 
-def of_interest(repo_document):
-    return True
+def of_interest(args, repo_document):
+    result = True
+    if args.only:
+        repo_name = get_nested(repo_document, 'body', 'full_name')
+        result = repo_name in args.only
+    return result
 
 
 def get_repos(table):
@@ -108,11 +114,11 @@ def main(driver=None):
     with tinydb.TinyDB(args.infile[0].name) as db:
         gh = db.table('GitHub')
         for repo in get_repos(gh):
-            if of_interest(repo):
+            if of_interest(args, repo):
                 status = collect_status(gh, repo)
                 repo_status.append(status)
 
-    report_repos(repo_status)
+    report_repos(args, repo_status)
 
 
 def parse_args():
@@ -121,6 +127,10 @@ def parse_args():
                         action='store_true')
     parser.add_argument("infile", help="input json file",
                         type=argparse.FileType(), nargs=1, default=sys.stdin)
+    parser.add_argument("--only", action="append",
+                        help="only include these owner/repo")
+    parser.add_argument("--header", action="store_true",
+                        help="Print CSV headers")
     args = parser.parse_args()
     global DEBUG
     DEBUG = args.debug
