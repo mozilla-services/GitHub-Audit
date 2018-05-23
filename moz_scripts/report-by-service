@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+warn() { for m ; do echo "$m" ; done 1>&2 ; }
+die() { warn "$@"; exit 2; }
+
+tmpdir=$(mktemp --tmpdir -d "$USER-${0##*/}-XXXXXX")
+warn "Files will be in $tmpdir"
+
+./get_repos.sh |
+while true; do
+    read line
+    if [[ -n $line ]]; then
+        if [[ "${line/\//}" == $line ]]; then # no slash
+            service=$line
+            header=--header
+            service_file=$tmpdir/$service.csv
+            echo "Repos for service $service" >"$service_file"
+        else
+            org_data=${line%/*}.db.json
+            if [[ ! -s $org_data ]]; then
+                warn "No file for ${org_data%.db.json} (used by $service), skipping"
+                echo "$line,<no_data>"
+            else
+                ./report_branch_status.py \
+                    --only $line \
+                    $header \
+                    $org_data
+                header=
+            fi >> $service_file
+        fi
+    else
+        break
+    fi
+done

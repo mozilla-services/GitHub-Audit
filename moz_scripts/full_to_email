@@ -1,0 +1,98 @@
+#!/usr/bin/env python
+"""
+    Massage cvs file format
+"""
+import argparse
+import collections
+import logging
+import os
+from pathlib import Path
+import csv
+
+_epilog = """
+"""
+DEBUG = False
+
+
+logger = logging.getLogger(__name__)
+
+Pseudo_code = """
+    for all files
+        read in data
+        transform data
+        write data to new file
+"""
+
+
+
+out_fields = collections.OrderedDict(
+    name='name',
+    status='Branch protection should be enabled for production branches',
+    link='Link to repository settings',
+)
+
+
+def process_file(args, path):
+    repos = []
+    with open(path, 'r') as infile:
+        service_line = infile.readline().strip()
+        service = service_line.split()[-1]
+        data = csv.reader(infile)
+        for repo in data:
+            repos.append(repo)
+    # defer directory creation until here
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    outpath = outdir.joinpath(f'{path.stem}-email.csv')
+    with open(outpath, 'w') as outfile:
+        # writer = csv.DictWriter(outfile, out_fields.values())
+        writer = csv.writer(outfile)
+        writer.writerow([service])
+        writer.writerow(out_fields.values())
+        for repo in repos:
+                status = repo[1].lower()
+                output = repo[:2]
+                output.append("")  # where link ends up
+                link_text= "Change" if status == "false" \
+                      else "Review" if status == "true" \
+                      else ""
+                output.append(link_text)
+                if '<no_data>' in repo:
+                    url = ""
+                else:
+                    url = f"https://github.com/{repo[0]}" \
+                           "/settings/branches/master"
+                output.append(url)
+                # writer.writerow(new_row)
+                writer.writerow(output)
+
+
+def main(args=None):
+    args = parse_args(args)
+    indir = Path(args.indir)
+    for p in indir.iterdir():
+        process_file(args, p)
+
+
+def parse_args(args=None):
+    parser = argparse.ArgumentParser(description=__doc__, epilog=_epilog)
+    parser.add_argument("indir", help='source csv directory',
+                        default=None)
+    parser.add_argument('--outdir', help='output directory')
+    parser.add_argument('--debug', help='Enter pdb on problem',
+                        action='store_true')
+    args = parser.parse_args()
+    global DEBUG
+    DEBUG = args.debug
+    if DEBUG:
+        logger.setLevel(logging.DEBUG)
+    return args
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(levelname)s: %(message)s')
+    try:
+        main()
+    except KeyboardInterrupt:
+        raise SystemExit
