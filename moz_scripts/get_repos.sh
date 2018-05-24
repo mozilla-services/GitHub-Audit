@@ -10,9 +10,9 @@ CLONE_DIR=/tmp/repo-list
 METADATA_PATH=services/metadata
 
 if [[ ! -d $CLONE_DIR ]]; then
-    git clone --depth 1 $CLONE_URL $CLONE_DIR
+    git clone --depth 1 $CLONE_URL $CLONE_DIR &>/dev/null
 else
-    git --git-dir $CLONE_DIR/.git pull
+    git --git-dir $CLONE_DIR/.git pull &>/dev/null
 fi
 
 for f in $CLONE_DIR/$METADATA_PATH/*json; do

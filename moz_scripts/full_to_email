@@ -37,6 +37,7 @@ def process_file(args, path):
     with open(path, 'r') as infile:
         service_line = infile.readline().strip()
         service = service_line.split()[-1]
+        _ = infile.readline()  # skip header row
         data = csv.reader(infile)
         for repo in data:
             repos.append(repo)

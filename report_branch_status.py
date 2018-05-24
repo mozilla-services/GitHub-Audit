@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-    Report on branches that don't match protection guidelines from local json
+    Report on branches that don't match protection guidelines from local
     data.
 """
 import argparse
@@ -51,7 +51,9 @@ def collect_status(gh, repo_doc):
     repo_url = repo_doc['url']
     default_branch = repo_doc['body']['default_branch']
     branch_url = f"{repo_url}/branches/{default_branch}"
-    name = get_nested(repo_doc, 'body', 'full_name')
+    # we want owner/repo in lower case to facilitate formatting in
+    # spreadsheets later on.
+    name = get_nested(repo_doc, 'body', 'full_name').lower()
 
     branch_doc = gh.get(q.url.matches(branch_url))
     protected = get_nested(branch_doc, 'body', 'protected', default=False)

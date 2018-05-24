@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
+prog_dir=$(cd $(dirname "$0"); /bin/pwd)
+
 warn() { for m ; do echo "$m" ; done 1>&2 ; }
 die() { warn "$@"; exit 2; }
 
 tmpdir=$(mktemp --tmpdir -d "$USER-${0##*/}-XXXXXX")
 warn "Files will be in $tmpdir"
 
-./get_repos.sh |
+${prog_dir}/get_repos.sh |
 while true; do
     read line
     if [[ -n $line ]]; then
@@ -14,12 +16,18 @@ while true; do
             service=$line
             header=--header
             service_file=$tmpdir/$service.csv
-            echo "Repos for service $service" >"$service_file"
+            # start a fresh service_file
+            echo "$service" >"$service_file"
         else
             org_data=${line%/*}.db.json
             if [[ ! -s $org_data ]]; then
                 warn "No file for ${org_data%.db.json} (used by $service), skipping"
-                echo "$line,<no_data>"
+                if [[ -n $header ]]; then
+                    echo "name,protected,restricted,enforcement,signed,team_used"
+                fi
+                # translate to lowercase for ease of spreadsheet
+                # formatting
+                echo "$(echo $line | tr 'A-Z' 'a-z'),<no_data>"
             else
                 ./report_branch_status.py \
                     --only $line \
