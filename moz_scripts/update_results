@@ -1,0 +1,61 @@
+#/usr/bin/env bash
+# vi: ft=sh :
+
+USAGE="usage: ${0##*/} [options] [db_file ...]
+Format tinydb files before importing for better diffs
+
+Arguments:
+    db_file	    TinyDB files to format. Default is './*.db.json'
+
+Options:
+    --output DIR    Directory for formated files. Default is '/tmp'
+    -h|--help	    output this help
+"
+
+set -eu
+
+warn() { for m; do echo "$m"; done 1>&2 ; }
+die() { warn "$@" ; exit 2; }
+usage() { warn "$@" "${USAGE:-}" ; [[ $# == 0 ]] && exit 0 || exit 1;}
+
+# Parse options
+out_dir='/tmp/'
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+	--output) out_dir="$2" ; shift ;;
+	-h|--help) usage ;;
+	-*) usage "Unknown option '$1'" ;;
+	*) break ;;
+    esac
+    shift
+done
+
+# Now have non-option args
+if [[ $# == 0 ]] ; then
+    set $(ls *.db.json)
+fi
+
+[[ $# == 0 ]] && usage "No files to format"
+
+[[ -d ${out_dir} ]] || usage "Not a directory: '${out_dir}'"
+
+function same_file() {
+    local orig="$1"
+    local out="$2"
+    touch "${out}"
+    local orig_inode=$(/usr/bin/env stat --format=%i "${orig}")
+    local out_inode=$(/usr/bin/env stat --format=%i "${out}")
+    [[ $orig_inode = $out_inode ]]
+    return $?
+}
+
+warn "Files output to ${out_dir}"
+for db_file in "$@" ; do
+    # Make sure we don't overwrite
+    out_file="${out_dir}/${db_file}"
+    if ! same_file "${db_file}" "${out_file}" ; then
+	jq . <"${db_file}" >"${out_file}"
+    else
+	warn "Not overwriting ${out_file} with ${db_file}"
+    fi
+done

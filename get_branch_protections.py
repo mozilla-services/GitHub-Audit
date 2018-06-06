@@ -28,9 +28,14 @@ def db_setup(org_name):
     setup db per org as org_name.db
     setup global queries into it
     '''
-    db = tinydb.TinyDB('{}.db.json'.format(org_name))
-    global last_table
-    last_table = db.table("GitHub")
+    try:
+        db = tinydb.TinyDB('{}.db.json'.format(org_name))
+        global last_table
+        last_table = db.table("GitHub")
+    except Exception:
+        # something very bad. provide some info
+        logger.error("Can't create/read db for '{}'".format(org_name))
+        raise
     return db
 
 
@@ -135,6 +140,7 @@ def ag_call(func, *args, expected_rc=None, new_only=True, headers=None,
         if DEBUG:
             import pudb; pudb.set_trace()  # noqa: E702
         else:
+            logger.error("{} for {}".format(rc, url))
             raise AG_Exception
     return body
 
@@ -302,26 +308,18 @@ def harvest_repo(repo):
 
 def harvest_org(org_name):
     def repo_fetcher():
-        if True:  # org:
-            logger.debug("Using API for repos")
-            for repo in ag_get_all(gh.orgs[org_name].repos.get, no_cache=True):
-                # hack - we can't cache on get_all, so redo repo query here
-                ag_call(gh.repos[repo['full_name']].get)
-                yield repo
-                wait_for_ratelimit()
-        # else:
-        #     logger.debug("Using DB for repos")
-        #     query = tinydb.Query()
-        #     for db_doc in branch_results.search(query.branch.owner.login.test(equals_as_lowercase, org_name)):
-        #         repo = db_doc['branch']
-        #         repo['full_name'] = db_doc['repo']
-        #         logger.debug("DB Repo: {}".format(db_doc['repo']))
-        #         yield repo
+        logger.debug("Using API for repos")
+        for repo in ag_get_all(gh.orgs[org_name].repos.get, no_cache=True):
+            # TODO: not sure yieldingj correct 'repo' here
+            # hack - we can't cache on get_all, so redo repo query here
+            ag_call(gh.repos[repo['full_name']].get)
+            yield repo
+            wait_for_ratelimit()
 
     logger.debug("Working on org '%s'", org_name)
     org_data = {}
     try:
-        org = ag_call(gh.orgs[org_name].get)
+        ag_call(gh.orgs[org_name].get)
     except AG_Exception:
         logger.error("No such org '%s'", org_name)
         return org_data
@@ -338,9 +336,20 @@ def process_orgs(args=None, collected_as=None):
         args = {}
     if not collected_as:
         collected_as = '<unknown>'
+    file_suffix = '.db.json'
     results = {}
     for org in args.org:
+        # org allowed to be specified as db filename, so strip suffix if there
+        if org.endswith(file_suffix):
+            org = org[:-len(file_suffix)]
+            # avoid foot gun of doubled suffixes from prior runs
+            if org.endswith(file_suffix):
+                logger.warn("Skipping org {}".format(org))
+                continue
+        logger.info("Starting on org %s."
+                    " (calls remaining %s).", org, ratelimit_remaining())
         try:
+            db = None
             db = db_setup(org)
             # global branch_results
             # branch_results = db.table('branch_results')
@@ -353,12 +362,13 @@ def process_orgs(args=None, collected_as=None):
                 org_data = harvest_org(org)
             results.update(org_data)
         finally:
-            meta_data = {
-                "collected_as": collected_as,
-                "collected_at": time.time(),
-            }
-            db.table('collection_data').insert({'meta': meta_data})
-            db_teardown(db)
+            if db is not None:
+                meta_data = {
+                    "collected_as": collected_as,
+                    "collected_at": time.time(),
+                }
+                db.table('collection_data').insert({'meta': meta_data})
+                db_teardown(db)
     logger.info("Finshed gathering branch protection data"
                 " (calls remaining %s).", ratelimit_remaining())
     return results
