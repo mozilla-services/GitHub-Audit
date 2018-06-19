@@ -1,18 +1,24 @@
 #!/usr/bin/env python
 """
-    Report on branches that don't match protection guidelines
+    Gather & locally cache data needed to determing compliance with branch
+    protection guidelines
 """
-_epilog = """
+import argparse
+import copy
+import json
+import logging
+import os
+import time
+
+from agithub.GitHub import GitHub
+import tinydb
+
+help_epilog = """
+Data will stored in a TinyDB (json) file, named '{org}.db.json'.
+
+WARNING: Remove any prior '{org}.db.json' file prior to execution. There is
+         currently a bad bug prevening updating an existing database.
 """
-import argparse  # noqa: E402
-import collections  # noqa: E402
-import copy  # noqa: E402
-import json  # noqa: E402
-import logging  # noqa: E402
-import os  # noqa: E402
-import time  # noqa: E402
-from agithub.GitHub import GitHub  # noqa: E402
-import tinydb  # noqa: E402
 
 DEBUG = False
 CREDENTIALS_FILE = '.credentials'
@@ -28,8 +34,16 @@ def db_setup(org_name):
     setup db per org as org_name.db
     setup global queries into it
     '''
+    db_filename = '{}.db.json'.format(org_name)
     try:
-        db = tinydb.TinyDB('{}.db.json'.format(org_name))
+        file_stat = os.stat(db_filename)
+        if file_stat.st_size > 0:
+            logger.warn("Updating '%s' may not work.", db_filename)
+    except OSError:
+        # okay if file doesn't exist
+        pass
+    try:
+        db = tinydb.TinyDB(db_filename)
         global last_table
         last_table = db.table("GitHub")
     except Exception:
@@ -109,6 +123,7 @@ def ag_call(func, *args, expected_rc=None, new_only=True, headers=None,
         doc['rc'] = rc
         doc['body'] = body
     elif rc == 304:
+        logger.warn("can't handle 304 for {}".format(url))
         body = doc.get('body', [])
     # Handle repo rename/removal corner cases
     elif rc == 301:
@@ -388,19 +403,15 @@ def main(driver=None):
         "collected_at": time.time(),
     }
     results.update(data)
-    if args.print:
-        print(json.dumps(results, indent=2, cls=BytesEncoder))
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__, epilog=_epilog)
+    parser = argparse.ArgumentParser(description=__doc__, epilog=help_epilog)
     parser.add_argument("org", help='Organization',
                         default=['mozilla-services'],
                         nargs='*')
     parser.add_argument('--repo', help='Only check for this repo')
     parser.add_argument('--debug', help='Enter pdb on problem',
-                        action='store_true')
-    parser.add_argument('--print', help='print huge json mess',
                         action='store_true')
     args = parser.parse_args()
     global DEBUG
@@ -413,7 +424,6 @@ def parse_args():
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s %(levelname)s: %(message)s')
-    logging.getLogger('github3').setLevel(logging.WARNING)
     try:
         main()
     except KeyboardInterrupt:
