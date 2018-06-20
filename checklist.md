@@ -1,5 +1,3 @@
-# **DRAFT**
-
 # Overview and Purpose
 
 GitHub is a wonderful ecosystem with many extensions to make certain
