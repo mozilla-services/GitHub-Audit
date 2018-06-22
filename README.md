@@ -20,3 +20,7 @@ the current directory.
   protected branches. Outputs JSON file, which
   ``report_branch_status.py`` can summarize to csv. Import that into a
   spreadsheet, and play.
+
+- ``term_search.py`` search orgs or repos for a specific term, such as
+  an API token name. Outputs list of repos that do have the term (per
+  GitHub's index, which can be out of date).
