@@ -21,6 +21,10 @@ the current directory.
   ``report_branch_status.py`` can summarize to csv. Import that into a
   spreadsheet, and play.
 
+- ``show_all_terms`` is a wrapper script around ``term_search.py``. It
+  makes local shallow clones of repos that match, and uses ``rg`` to
+  search for additional occurances. Use the ``--help`` option.
+
 - ``term_search.py`` search orgs or repos for a specific term, such as
   an API token name. Outputs list of repos that do have the term (per
   GitHub's index, which can be out of date).
