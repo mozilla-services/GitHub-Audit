@@ -7,6 +7,7 @@ import copy
 import json
 import logging
 import time
+import urllib.parse
 
 from agithub.GitHub import GitHub
 
@@ -33,6 +34,9 @@ def ag_call(
     Not smart, and hides any error information from caller.
     But very convenient. :)
     """
+    def query_string():
+        return urllib.parse.quote_plus(kwargs["q"])
+
     if not headers:
         headers = {}
     url = func.keywords["url"]
@@ -53,13 +57,21 @@ def ag_call(
         # TODO: do something better, like switch to using id's
         # for now, act like nothing is there
         body = []
+    elif rc == 403 and rc not in expected_rc:
+        # don't throw on this one, but do show query string
+        # for search, there is a seperate rate limit we don't yet take into
+        # account:
+        #  https://developer.github.com/v3/search/#rate-limit
+        logger.error("403 for query string '{}'".format(query_string()))
+        logger.error("response: '{}'".format(repr(body)))
+        expected_rc.append(rc)
     elif rc == 404 and rc not in expected_rc:
         logger.error("No longer available or access denied: {}".format(url))
         # TODO: Figure out what to do here. Maybe it's just that message, but
         # maybe need to delete from DB before next run
         body = []
         # don't throw on this one
-        expected_rc.append(404)
+        expected_rc.append(rc)
     logger.debug("{} for {}".format(rc, url))
 
     if rc not in expected_rc:
@@ -181,6 +193,10 @@ def matching_repos(scope, term):
     kwargs = {"q": q}
     found_repos = set()
     for body in ag_get_all(gh.search.code.get, **kwargs):
+        if "items" not in body:
+            # 403 or something we don't expect
+            logger.error("Unexpected keys: {}".format(" ".join(body.keys())))
+            break
         logger.debug("items in body: {}".format(len(body["items"])))
         for match in body["items"]:
             repo = match["repository"]["full_name"]
