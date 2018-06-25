@@ -34,6 +34,7 @@ def ag_call(
     Not smart, and hides any error information from caller.
     But very convenient. :)
     """
+
     def query_string():
         return urllib.parse.quote_plus(kwargs["q"])
 
