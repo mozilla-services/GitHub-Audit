@@ -14,6 +14,7 @@ import os  # noqa: E402
 import sys  # noqa: E402
 import time  # noqa: E402
 import urllib.parse  # noqa: E402
+
 # import tinydb  # noqa: E402
 
 DEBUG = False
@@ -26,8 +27,9 @@ Pseudo_code = """
             ouput default branch protection
 """
 
-Repo = collections.namedtuple('Repo', "name protected restricted enforcement"
-                              " signed team_used".split())
+Repo = collections.namedtuple(
+    "Repo", "name protected restricted enforcement" " signed team_used".split()
+)
 
 
 def report_repos(repo_dict):
@@ -40,24 +42,32 @@ def report_repos(repo_dict):
         return eventual_obj
 
     report = []
-    for name, info in ((k, v) for k, v in repo_dict.items() if '/' in k):
+    for name, info in ((k, v) for k, v in repo_dict.items() if "/" in k):
         protected = get_nested(info, "default_protected", default=False)
         # protections apply to admins
-        enforcement = get_nested(info, "protections", "enforce_admins",
-                                 "enabled", default=False)
+        enforcement = get_nested(
+            info, "protections", "enforce_admins", "enabled", default=False
+        )
         # limit commits to default
-        num_teams = len(get_nested(info, "protections", "restrictions",
-                                   "teams", default=[]))
-        num_users = len(get_nested(info, "protections", "restrictions",
-                                   "users", default=[]))
+        num_teams = len(
+            get_nested(info, "protections", "restrictions", "teams", default=[])
+        )
+        num_users = len(
+            get_nested(info, "protections", "restrictions", "users", default=[])
+        )
         limited_commits = bool(num_teams + num_users > 0)
         # commits signed
-        signing_required = get_nested(info, "signatures", "enabled",
-                                      default=False)
+        signing_required = get_nested(info, "signatures", "enabled", default=False)
         # prefer team restrictions
         team_preferred = num_teams > 0 and num_users == 0
-        repo = Repo(name, protected, limited_commits, enforcement,
-                    signing_required, team_preferred)
+        repo = Repo(
+            name,
+            protected,
+            limited_commits,
+            enforcement,
+            signing_required,
+            team_preferred,
+        )
         report.append(repo)
     writer = csv.writer(sys.stdout)
     writer.writerow(Repo._fields)
@@ -78,7 +88,7 @@ def full_name_from_url(url):
     # parts.path has leading '/', so first element is empty
     path = parts.path.split("/")
     owner, repo = path[1:3]
-    if repo.endswith('.git'):
+    if repo.endswith(".git"):
         repo = repo[:-4]
     return "{}/{}".format(owner, repo)
 
@@ -95,15 +105,13 @@ def main(driver=None):
             row.extend(status_reports[full_name])
         except KeyError:
             row.append("Missing data for repo '{}'".format(full_name))
-        print(','.join(row))
+        print(",".join(row))
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__, epilog=_epilog)
-    parser.add_argument('--debug', help='Enter pdb on problem',
-                        action='store_true')
-    parser.add_argument("--services", help="input json file",
-                        type=argparse.FileType())
+    parser.add_argument("--debug", help="Enter pdb on problem", action="store_true")
+    parser.add_argument("--services", help="input json file", type=argparse.FileType())
     parser.add_argument("csv_files", help="repo status csv files", nargs="+")
     args = parser.parse_args()
     global DEBUG
@@ -113,9 +121,10 @@ def parse_args():
     return args
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s %(levelname)s: %(message)s')
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s"
+    )
     try:
         rc = main()
     except (KeyboardInterrupt, BrokenPipeError):
