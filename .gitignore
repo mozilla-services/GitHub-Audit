@@ -2,6 +2,8 @@
 .credentials
 # cached data per organization (tinydb format)
 *.db.json*
+# misc work files
+consolidated.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
