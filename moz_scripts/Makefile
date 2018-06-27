@@ -44,6 +44,8 @@ help:
 	@echo "  report      build the per-service reports"
 	@echo "  consolidate gather all per-service reports for spreadsheet import"
 	@echo "              into consolidate.csv"
+	@echo "  store       store latest data into foxsec-results"
+	@echo "              (manual push required)"
 
 list:
 	@echo $(ALL_ORGS)
@@ -62,4 +64,20 @@ consolidate:
 	@# force the sort order we want
 	env LANG=en_US.UTF-8 bash -c 'cat $$(ls -1td /tmp/$$USER-report-by-service-* | head -1)/*.csv' >consolidated.csv
 
-.PHONY: list clean get report consolidate help
+store:
+	bash -xc ' \
+		tmp_dir=$$(mktemp -d /tmp/$${USER}-GitHub-Audit-XXXXXX) ; \
+		echo Using $$tmp_dir for work ; \
+		pushd $$tmp_dir &>/dev/null ; \
+		git clone --depth 1 git+ssh://github.com/mozilla-services/foxsec-results ; \
+		cd foxsec-results/github-configs ; \
+		for f in ~1/*.db.json ; do \
+		  jq . < $$f > $${f##*/} ; \
+		done ; \
+		git commit -am "$$(date +%F) github-configs update" \
+		'
+	@echo "Manually push from $$(ls -1td /tmp/$${USER}-GitHub-Audit-* | head -1)"
+	@# force failure to ensure push done prior to anything else
+	false
+
+.PHONY: list clean get report consolidate help store
