@@ -29,9 +29,9 @@ ALL_ORGS := $(SERVICE_ORGS) $(OTHER_ORGS)
 ALL_DBS := $(SERVICE_DBS) $(OTHER_DBS)
 
 # Local Static Rules
-.PHONY: $(CACHE_DIR)/$(ALL_ORGS)
-$(CACHE_DIR)/$(ALL_DBS) : %.db.json: %
-	@echo cd $(CACHE_DIR) && ./get_branch_protections.py $@
+.PHONY: $(ALL_ORGS)
+$(ALL_DBS) : %.db.json: %
+	./get_branch_protections.py $@
 
 help:
 	@echo "Makefile to run repo status reports"
@@ -46,6 +46,9 @@ help:
 	@echo "              into consolidate.csv"
 	@echo "  store       store latest data into foxsec-results"
 	@echo "              (manual push required)"
+	@echo ""
+	@echo "  get_others  obtain all data for non-service orgs"
+	@echo "  get_all     obtain all data for all configured orgs"
 
 list:
 	@echo $(ALL_ORGS)
@@ -55,7 +58,9 @@ clean:
 	@echo rm -rf $(CACHE_DIR)
 	@echo mkdir $(CACHE_DIR)
 
-get: $(CACHE_DIR)/$(SERVICE_DBS)
+get: $(SERVICE_DBS)
+get_others: $(OTHER_DBS)
+get_all: $(ALL_DBS)
 
 report:
 	moz_scripts/report-by-service
