@@ -49,6 +49,19 @@ Now cd into the directory given in the output from the last make invocation.
 Verify that the commit looks sane (I usually do ``git log -n1 --stat``), then
 push from there.
 
+Filing Issues
+-------------
+
+You can automatically file issues for repos that appear to be out of compliance.
+
+To file (or reopen) issues about "protected" status not being set::
+
+    make -f moz_scripts/Makefile open_protected_issues
+
+Review the output for ERROR messages. Failure to open an issue with status 410
+likely means the repository is a fork that does not have issues enabled. An
+alternate way of informing the team will be needed.
+
 Report Processing
 -----------------
 
