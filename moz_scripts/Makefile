@@ -46,6 +46,8 @@ help:
 	@echo "              into consolidate.csv"
 	@echo "  store       store latest data into foxsec-results"
 	@echo "              (manual push required)"
+	@echo "  open_protected_issues  open GitHub issues on repositories which"
+	@echo "                         do not have branch protection enabled"
 	@echo ""
 	@echo "  get_others  obtain all data for non-service orgs"
 	@echo "  get_all     obtain all data for all configured orgs"
@@ -65,9 +67,13 @@ get_all: $(ALL_DBS)
 report:
 	moz_scripts/report-by-service
 
+consolidated.csv \
 consolidate:
 	@# force the sort order we want
 	env LANG=en_US.UTF-8 bash -c 'cat $$(ls -1td /tmp/$$USER-report-by-service-* | head -1)/*.csv' >consolidated.csv
+
+open_protected_issues: consolidated.csv
+	moz_scripts/open_issues.py $$(grep '/' consolidated.csv | cut -d, -f1,2 | grep False$$ | cut -d, -f1)
 
 store:
 	bash -xc ' \
