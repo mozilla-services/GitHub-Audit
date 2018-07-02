@@ -419,12 +419,12 @@ def main(driver=None):
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__, epilog=help_epilog)
-    parser.add_argument(
-        "org", help="Organization", default=["mozilla-services"], nargs="*"
-    )
+    parser.add_argument("org", help="Organization", nargs="+")
     parser.add_argument("--repo", help="Only check for this repo")
     parser.add_argument("--debug", help="Enter pdb on problem", action="store_true")
     args = parser.parse_args()
+    if "/" in args.repo:
+        parser.error("Do not specify org in value of --repo")
     global DEBUG
     DEBUG = args.debug
     if DEBUG:
