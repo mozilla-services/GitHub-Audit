@@ -28,7 +28,7 @@ Pseudo_code = """
 """
 
 Repo = collections.namedtuple(
-    "Repo", "name protected restricted enforcement" " signed team_used".split()
+    "Repo", "name protected restricted enforcement signed team_used".split()
 )
 
 
