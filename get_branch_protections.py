@@ -357,6 +357,13 @@ def harvest_org(org_name):
     return org_data
 
 
+def get_my_orgs():
+    orgs = []
+    for response in ag_get_all(gh.user.orgs.get, no_cache=True):
+        orgs.append(response["login"])
+    return orgs
+
+
 def process_orgs(args=None, collected_as=None):
     logger.info(
         "Gathering branch protection data." " (calls remaining %s).",
@@ -366,9 +373,13 @@ def process_orgs(args=None, collected_as=None):
         args = {}
     if not collected_as:
         collected_as = "<unknown>"
+    if args.all_orgs:
+        orgs = get_my_orgs()
+    else:
+        orgs = args.orgs
     file_suffix = ".db.json"
     results = {}
-    for org in args.org:
+    for org in orgs:
         # org allowed to be specified as db filename, so strip suffix if there
         if org.endswith(file_suffix):
             org = org[: -len(file_suffix)]
@@ -398,7 +409,7 @@ def process_orgs(args=None, collected_as=None):
                 db.table("collection_data").insert({"meta": meta_data})
                 db_teardown(db)
     logger.info(
-        "Finshed gathering branch protection data" " (calls remaining %s).",
+        "Finished gathering branch protection data" " (calls remaining %s).",
         ratelimit_remaining(),
     )
     return results
@@ -419,12 +430,17 @@ def main(driver=None):
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__, epilog=help_epilog)
-    parser.add_argument("org", help="Organization", nargs="+")
+    parser.add_argument("orgs", help="Organization", nargs="*")
+    parser.add_argument("--all-orgs", help="Check all orgs", action="store_true")
     parser.add_argument("--repo", help="Only check for this repo")
     parser.add_argument("--debug", help="Enter pdb on problem", action="store_true")
     args = parser.parse_args()
-    if "/" in args.repo:
+    if args.repo and "/" in args.repo:
         parser.error("Do not specify org in value of --repo")
+    elif args.all_orgs and len(args.orgs) > 0:
+        parser.error("Can't specify --all-orgs & positional args")
+    elif len(args.orgs) == 0 and not args.all_orgs:
+        parser.error("Must specify at least one org (or use --all-orgs)")
     global DEBUG
     DEBUG = args.debug
     if DEBUG:
