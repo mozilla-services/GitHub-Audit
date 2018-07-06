@@ -34,7 +34,7 @@ Pseudo_code = """
 """
 
 Repo = collections.namedtuple(
-    "Repo", "name protected restricted enforcement" " signed team_used".split()
+    "Repo", "name mfa protected restricted enforcement signed team_used".split()
 )
 
 
@@ -52,6 +52,13 @@ def collect_status(gh, repo_doc):
     repo_url = repo_doc["url"]
     default_branch = repo_doc["body"]["default_branch"]
     branch_url = f"{repo_url}/branches/{default_branch}"
+
+    # mfa status comes from owner
+    org = get_nested(repo_doc, "body", "owner", "login")
+    org_url = f"/orgs/{org}"
+    org_doc = gh.get(q.url.matches(org_url))
+    mfa = get_nested(org_doc, "body", "two_factor_requirement_enabled", default=False)
+
     # we want owner/repo in lower case to facilitate formatting in
     # spreadsheets later on.
     name = get_nested(repo_doc, "body", "full_name").lower()
@@ -82,7 +89,13 @@ def collect_status(gh, repo_doc):
     # prefer team restrictions
     team_preferred = num_teams > 0 and num_users == 0
     repo = Repo(
-        name, protected, limited_commits, enforcement, signing_required, team_preferred
+        name,
+        mfa,
+        protected,
+        limited_commits,
+        enforcement,
+        signing_required,
+        team_preferred,
     )
     return repo
 
