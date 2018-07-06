@@ -10,7 +10,7 @@ Report on GitHub organizations and repositories for adherence to
 -->
 
 GitHub-Audit is a set of scripts which can be used to query various
-aspects of an organization or repository. 
+aspects of an organization or repository.
 
 These scripts are intended to be usable both from the command line (CLI)
 and via automation (using 12 Factor principles whenever possible).
@@ -38,6 +38,9 @@ are often described there.
 These checks require a PAT token available. The PAT
 token should be on the second line of a file named ``.credentials`` in
 the current directory (s/a #3).
+
+Each of the scripts below supports a ``--help`` option. Use that for
+additional information on invoking each script.
 
 - ``get_branch_protections.py`` * to extract the information about
   protected branches. Outputs JSON file, which
@@ -80,6 +83,7 @@ Distributed under the Mozilla Public License, version 2 (MPL-2) license. See ``L
 
 1. Discuss any new feature first by opening an issue.
 1. Fork it (<https://github.com/mozilla-services/GitHub-Audit/fork>)
+1. Clone your fork to your development environment.
 2. Create your feature branch (`git checkout -b feature/fooBar`)
 3. Commit your changes (`git commit -am 'Add some fooBar'`)
 4. Push to the branch (`git push origin feature/fooBar`)
