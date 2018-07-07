@@ -19,16 +19,30 @@ and via automation (using 12 Factor principles whenever possible).
 ## Installation
 
 For now, users should clone the repository, and install the requirements
-using [``pipenv``][pipenv_url]:
+using [``poetry``][poetry_url]:
 
 ```sh
 git clone https://GitHub.com/Mozilla-Services/GitHub-Audit
 cd GitHub-Audit
-pipenv install
+poetry install
 ```
 
 
 ## Usage example
+
+NOTE: run all scripts in the virtual environment created by poetry. From
+within the checkout, either activate the virtualenv:
+
+```sh
+$ poetry shell
+$ # run scripts
+$ exit  # deactivate virtual env
+```
+Or run each script within the virtual env:
+
+```sh
+$ poetry run {script}
+```
 
 All scripts should respond to the ``--help`` option. Additional options
 are often described there.
@@ -67,7 +81,7 @@ This project uses [Black][black_url] to format all python code. A
 
 To ready your environment for development, do:
 ```sh
-pipenv install --dev
+poetry install --dev
 pre-commit install
 ```
 
@@ -93,6 +107,6 @@ Distributed under the Mozilla Public License, version 2 (MPL-2) license. See ``L
 [wiki]: https://github.com/mozilla-services/Github-Audit/wiki
 [black_url]: https://black.readthedocs.io/en/stable/index.html
 [pre_commit_url]: https://pre-commit.com/
-[pipenv_url]: https://docs.pipenv.org/
+[poetry_url]: https://github.com/sdispater/poetry
 [guidelines_url]: https://wiki.mozilla.org/GitHub/Repository_Security
 [background_url]: docs/README.md

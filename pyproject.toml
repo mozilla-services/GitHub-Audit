@@ -1,3 +1,19 @@
+[tool.poetry]
+name = "github-audit"
+version = "0.1.0"
+description = "Audit Tools for Mozilla Guidance"
+authors = ["Hal Wine <hwine@mozilla.com>"]
+license = "MPL-2.0"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+agithub = "^2.1"
+tinydb = "^3.9"
+PyYAML = "^3.12"
+
+[tool.poetry.dev-dependencies]
+pudb = "^2018.1"
+
 # Default from https://github.com/ambv/black/blob/master/pyproject.toml
 [tool.black]
 line-length = 88
