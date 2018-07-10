@@ -89,14 +89,15 @@ There are 3 steps, covered in detail below:
 
 #.  Update the trend chart sheet(s).
     The trick here is to account for any additions or deletions in the
-    repositories we monitor.
+    repositories we monitor. (Note that this will need to be modified when we
+    trend anything else.)
 
-    #.  On the trend sheet, select columns B & C, right click, and choose
-        "Insert 2 left".
-    #.  On the current data sheet, select column A & the column with the value
-        to trend. Copy those columns.
+    #.  On the trend sheet, select columns B, C, & D, right click, and choose
+        "Insert 3 left".
+    #.  On the current data sheet, select column A, B, & C. Copy those columns.
     #.  Back on the trend sheet, select cell B1 and paste. Adjust column widths
         to see column B (service & repo name) text.
+    #.  Delete column C (MFA compliance)
     #.  Starting from the top, find the first mismatch between columns A & B and
         adjust as follows to align them:
 
