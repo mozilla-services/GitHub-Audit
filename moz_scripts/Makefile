@@ -48,6 +48,7 @@ help:
 	@echo "              into consolidate.csv"
 	@echo "  store       store latest data into foxsec-results"
 	@echo "              (manual push required)"
+	@echo "  preview_new_issues     show what open_protected_issues would do"
 	@echo "  open_protected_issues  open GitHub issues on repositories which"
 	@echo "                         do not have branch protection enabled"
 	@echo ""
@@ -87,8 +88,11 @@ consolidate:
 	@# force the sort order we want
 	env LANG=en_US.UTF-8 bash -c 'cat $$(ls -1td /tmp/$$USER-report-by-service-* | head -1)/*.csv' >consolidated.csv
 
+preview_new_issues: consolidated.csv
+	moz_scripts/open_issues.py --dry-run $$(grep '/' consolidated.csv | cut -d, -f1,3 | grep False$$ | cut -d, -f1)
+
 open_protected_issues: consolidated.csv
-	moz_scripts/open_issues.py $$(grep '/' consolidated.csv | cut -d, -f1,2 | grep False$$ | cut -d, -f1)
+	moz_scripts/open_issues.py $$(grep '/' consolidated.csv | cut -d, -f1,3 | grep False$$ | cut -d, -f1)
 
 store:
 	bash -c ' \
