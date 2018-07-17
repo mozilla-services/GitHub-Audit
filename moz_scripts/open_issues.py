@@ -12,6 +12,7 @@ import time
 import urllib.parse
 
 from agithub.GitHub import GitHub
+import yaml
 
 help_epilog = """
 Uses GitHub's search to find existing issues, then reopens or creates one as
@@ -20,7 +21,7 @@ appropriate.
 
 DEBUG = False
 CREDENTIALS_FILE = ".credentials"
-MESSAGES_FILE = "messages.yaml"
+MESSAGES_FILE = "moz_scripts/messages.yaml"
 
 
 class AG_Exception(Exception):
@@ -145,18 +146,27 @@ def ratelimit_remaining():
     return body["resources"]["core"]["remaining"]
 
 
-def wait_for_ratelimit(min_karma=25, msg=None):
-    while gh:
-        payload = ag_call(gh.rate_limit.get, no_cache=True)
-        if payload["resources"]["core"]["remaining"] < min_karma:
-            core = payload["resources"]["core"]
+def wait_for_ratelimit(min_karma=25, msg=None, usingSearch=False):
+    def nap_if_needed(resource, min_karma, msg=None):
+        napped = False
+        if resource["remaining"] < min_karma:
             now = time.time()
-            nap = max(core["reset"] - now, 0.1)
+            nap = max(resource["reset"] - now, 0.1)
             logger.info("napping for %s seconds", nap)
             if msg:
                 logger.info(msg)
             time.sleep(nap)
-        else:
+            napped = True
+        return napped
+
+    # repeat until good on all channels
+    while gh:
+        payload = ag_call(gh.rate_limit.get, no_cache=True)
+        napped = nap_if_needed(payload["resources"]["core"], min_karma, msg)
+        if usingSearch:
+            napped = nap_if_needed(payload["resources"]["search"], 1, msg) or napped
+
+        if not napped:
             break
 
 
@@ -177,6 +187,7 @@ Pseudo_code = """
 
 # SHH, globals, don't tell anyone
 gh = None
+messages = None
 
 
 def matching_repos(scope, term):
@@ -209,53 +220,55 @@ class NoIssue(Exception):
     pass
 
 
-def get_message(owner, repo):
+def get_message(owner, repo, msg_id):
     """
     Return a fully expanded message body & title
-
-    ToDo: read from yaml file
     """
-    title = "Set protected status on production branch"
-    message = """
-The production branch on this repository is not protected against \
-force pushes. This setting is recommended as part of [Mozilla's \
-Guidelines][guidelines_url] for a Sensitive Repository.
-
-**Anyone with admin permissions for this repository can correct the \
-setting using [this URL][protect_url].**
-
-If you have any questions, or believe this issue was opened in \
-error, please contact [us][email] and mention SOGH0001 and this repository.
-
-Thank you for your prompt attention to this issue.
---Firefox Security Operations team
-
-[guidelines_url]: https://wiki.mozilla.org/GitHub/Repository_Security
-[protect_url]: https://github.com/{owner}/{repo}/settings/branches
-[email]: <mailto:secops+github@mozilla.com?subject=SOGH0001+Question+re+\
-{owner}/{repo}>
-    """.format(
-        **locals()
-    ).strip()
+    title = messages["Messages"][msg_id]["title"].format(**locals())
+    message = messages["Messages"][msg_id]["message"].format(**locals())
 
     logger.debug("title: '%s'", title)
     logger.debug("message: '%s'", message)
     return title, message
 
 
-def find_existing_issue(owner, repo):
-    logger.warning("Search not yet implemented, will always open new issue")
+def find_existing_issue(owner, repo, term):
+    """
+    Generator for repositories containing term
+    """
+    q = term + " is:issue"
+    q += " repo:{}/{}".format(owner, repo)
+    kwargs = {"q": q}
+    wait_for_ratelimit(usingSearch=True)
+    for body in ag_get_all(gh.search.issues.get, **kwargs):
+        if "items" not in body:
+            # 403 or something we don't expect
+            logger.error("Unexpected keys: {}".format(" ".join(body.keys())))
+            break
+        issue_count = len(body["items"])
+        logger.debug("items in body: {}".format(issue_count))
+        if issue_count > 1:
+            logger.error(
+                "Unexpected Issue Count {} for {}/{}".format(issue_count, owner, repo)
+            )
+        for match in body["items"]:
+            state = match["state"]
+            number = match["number"]
+            return number, state
+        wait_for_ratelimit(usingSearch=True)
     raise NoIssue
 
 
-def update_issue(owner, repo, issue):
+def update_issue(owner, repo, standard_id, issue, state):
     """
         Update an existing issue, and make sure it is not closed.
 
         ToDo: consider different message text when reopening
               maybe prepend "REOPENED: " to title?
     """
-    _, text = get_message(owner, repo)
+    logger.debug("Reusing {} for {}/{}".format(issue, owner, repo))
+    msg_id = next_message_id(standard_id, state)
+    _, text = get_message(owner, repo, msg_id)
     # open bug in case it was closed
     payload = {"state": "open"}
     func = gh.repos[owner][repo].issues[issue].patch
@@ -273,11 +286,45 @@ def update_issue(owner, repo, issue):
     return
 
 
-def create_issue(owner, repo):
+def next_message_id(standard_id, issue_state, force=False):
+    """
+        Compute correct message to issue
+    """
+    try:
+        # load standard progression
+        standard = [
+            x for x in messages["Standards"] if str(x["standard number"]) == standard_id
+        ][0]
+        if force:
+            key = "admin set"
+        elif issue_state is None:
+            key = "new message id"
+        elif issue_state == "open":
+            key = "still open message id"
+        elif issue_state == "closed":
+            key = "reopen message id"
+        else:
+            logger.error("Unknown bug state '{}'".format(issue_state))
+            key = "new message id"
+
+        next_id = standard[key]
+        logger.debug(
+            "Message id {} for std {}, state {}".format(
+                next_id, standard_id, issue_state
+            )
+        )
+    except (IndexError, KeyError):
+        logger.error("YAML access error for std {}".format(standard_id))
+    return next_id
+
+
+def create_issue(owner, repo, standard_id):
     """
         Create a new issue
     """
-    title, text = get_message(owner, repo)
+    logger.debug("Creating issue for {}/{}".format(owner, repo))
+    msg_id = next_message_id(standard_id, None)
+    title, text = get_message(owner, repo, msg_id)
     payload = {"title": title, "body": text}
     func = gh.repos[owner][repo].issues.post
     url = func.keywords["url"]
@@ -290,11 +337,17 @@ def create_issue(owner, repo):
         logger.error("Issue not opened for %(url)s status %(status)s", locals())
 
 
+def load_messages(file_name):
+    global messages
+    messages = yaml.safe_load(open(file_name))
+
+
 def main(driver=None):
     args = parse_args()
+    msg_id = args.id
     global gh
     gh = get_github_client()
-    wait_for_ratelimit()
+    wait_for_ratelimit(usingSearch=True)
     body = ag_call(gh.user.get)
     collected_as = body["login"]
     logger.info(
@@ -302,23 +355,38 @@ def main(driver=None):
             collected_as, ratelimit_remaining()
         )
     )
+    load_messages(args.message_file or MESSAGES_FILE)
     for repo_full_name in args.repos:
         logger.info("Starting on {}".format(repo_full_name))
+        wait_for_ratelimit(usingSearch=True)
         owner, repo = repo_full_name.split("/")
         try:
-            issue = find_existing_issue(owner, repo)
-            update_issue(owner, repo, issue)
+            issue, state = find_existing_issue(
+                owner,
+                repo,
+                "FYI: Renovate will auto open PRs for vulnerabilities on 2018-08-08",
+            )
+            update_issue(owner, repo, msg_id, issue, state)
         except NoIssue:
-            create_issue(owner, repo)
+            create_issue(owner, repo, msg_id)
     logger.info("Done with {} API calls remaining".format(ratelimit_remaining()))
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__, epilog=help_epilog)
-    parser.add_argument("repos", help="owner/repo to open issue on", nargs="+")
+    parser.add_argument(
+        "repos", help="owner/repo to open issue on", nargs="+", metavar="org/repo"
+    )
+    parser.add_argument("--id", help="Message ID for new bugs", default="1")
+    parser.add_argument("--message-file", help="YAML file with messages")
     parser.add_argument("--debug", help="log at DEBUG level", action="store_true")
     parser.add_argument("--dry-run", help="Do not open issues", action="store_true")
     args = parser.parse_args()
+
+    # validate repos are org/repo
+    bad_args = [x for x in args.repos if x.count("/") != 1]
+    if len(bad_args):
+        parser.error("Bad '/' usage in repos: {}".format(", ".join(bad_args)))
 
     global DEBUG, DRY_RUN
     DRY_RUN = args.dry_run
