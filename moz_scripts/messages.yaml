@@ -1,0 +1,60 @@
+# YAML file for GitHub issue templates
+
+---
+
+# list of dictionaries, each dictionary has
+#   standard number
+#   new_message_id
+#   reopen_message_id
+#   still_open_message_id
+# if any are missing, raise error
+#
+
+Standards:
+  - standard number: 1
+    standard description: Production branches should be protected
+    new message id: SOGH0001
+    reopen message id: SOGH0002
+    still open message id: SOGH0003
+    admin set: SOGH0004
+
+# Messages will be interpolated at run time. Variables available
+# include:
+#   owner - GitHub user or org
+#   repo  - repository name
+#   msg_id  - the message id from the standards section
+Messages:
+    SOGH0001:
+        title: &protected_branch_title "Set protected status on production branch"
+        message: &protected_branch_message >
+            The production branch on this repository is not protected against
+            force pushes. This setting is recommended as part of [Mozilla's
+            Guidelines][guidelines_url] for a Sensitive Repository.
+
+            **Anyone with admin permissions for this repository can correct the
+            setting using [this URL][protect_url].**
+
+            If you have any questions, or believe this issue was opened in
+            error, please contact [us][email] and mention {msg_id} and this repository.
+
+            Thank you for your prompt attention to this issue.
+
+            --Firefox Security Operations team
+
+            [guidelines_url]: https://wiki.mozilla.org/GitHub/Repository_Security
+
+            [protect_url]: https://github.com/{owner}/{repo}/settings/branches
+
+            [email]: <mailto:secops+gh001@mozilla.com?subject={msg_id}+Question+re+{owner}/{repo}>
+
+    SOGH0002:
+        title: *protected_branch_title
+        message: *protected_branch_message
+
+    SOGH0003:
+        title: *protected_branch_title
+        message: *protected_branch_message
+
+    SOGH0004:
+        title: *protected_branch_title
+        message: *protected_branch_message
