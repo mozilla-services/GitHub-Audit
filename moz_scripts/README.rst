@@ -39,11 +39,7 @@ Data Collection
 
 To gather the needed data, you can use the Makefile targets for most steps::
 
-    make -f moz_scripts/Makefile clean
-    make -f moz_scripts/Makefile get        # can take over 4 hours
-    make -f moz_scripts/Makefile report
-    make -f moz_scripts/Makefile consolidate
-    make -f moz_scripts/Makefile store
+    make -f moz_scripts/Makefile full       # can take over 4 hours
 
 Now cd into the directory given in the output from the last make invocation.
 Verify that the commit looks sane (I usually do ``git log -n1 --stat``), then
@@ -117,7 +113,7 @@ There are 3 steps, covered in detail below:
                 #.  Make a block select selection in columns B & C between the
                     first mismatch in column B up to, but not including, the same
                     value in column A.
-                #.  Right click and choose "Add cells" => "Shift down".
+                #.  Right click and choose "Insert cells" => "Shift down".
                 #.  Columns A & B should now have the same text.
 
         Repeat until you reach the bottom of the list.
