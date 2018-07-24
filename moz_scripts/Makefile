@@ -51,18 +51,26 @@ help:
 	@echo ""
 	@echo "  get_others  obtain all data for non-service orgs"
 	@echo "  get_all     obtain all data for all configured orgs"
+	@echo ""
+	@echo "  full        full workflow for service orgs"
+	@echo "  full_others full workflow for non-service orgs"
+	@echo "  full_all    full workflow for all configured orgs"
 
 list:
 	@echo $(ALL_ORGS)
 	@echo $(SERVICE_DBS)
 
 clean:
-	@echo rm -rf $(CACHE_DIR)
-	@echo mkdir $(CACHE_DIR)
+	rm -f *.json consolidated.csv
 
 get: $(SERVICE_DBS)
 get_others: $(OTHER_DBS)
 get_all: $(ALL_DBS)
+
+_full_common: report consolidate store
+full: clean get _full_common
+full_others: clean get_others _full_common
+full_all: clean get_all _full_common
 
 report:
 	moz_scripts/report-by-service
@@ -76,7 +84,7 @@ open_protected_issues: consolidated.csv
 	moz_scripts/open_issues.py $$(grep '/' consolidated.csv | cut -d, -f1,2 | grep False$$ | cut -d, -f1)
 
 store:
-	bash -xc ' \
+	bash -c ' \
 		tmp_dir=$$(mktemp -d /tmp/$${USER}-GitHub-Audit-XXXXXX) ; \
 		echo Using $$tmp_dir for work ; \
 		pushd $$tmp_dir &>/dev/null ; \
@@ -88,7 +96,7 @@ store:
 		git commit -am "$$(date +%F) github-configs update" \
 		'
 	@echo "Manually push from $$(ls -1td /tmp/$${USER}-GitHub-Audit-* | head -1)"
-	@# force failure to ensure push done prior to anything else
+	@echo "Forcing failure to ensure push done prior to anything else"
 	false
 
 .PHONY: list clean get report consolidate help store
