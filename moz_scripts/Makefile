@@ -93,9 +93,10 @@ store:
 		for f in ~1/*.db.json ; do \
 		  jq . < $$f > $${f##*/} ; \
 		done ; \
-		git commit -am "$$(date +%F) github-configs update" \
+		git commit -am "$$(date +%F) github-configs update" ; \
+		git log -n1 --stat \
 		'
-	@echo "Manually push from $$(ls -1td /tmp/$${USER}-GitHub-Audit-* | head -1)"
+	@echo "Manually push from $$(ls -1td /tmp/$${USER}-GitHub-Audit-*/foxsec-results/ | head -1)"
 	@echo "Forcing failure to ensure push done prior to anything else"
 	false
 
