@@ -106,6 +106,7 @@ There are 3 steps, covered in detail below:
                 #.  You'll now have a block of empty cells in columns B & C.
                     Select them, right click, and choose "Delete Cells" => "Shift
                     Up".
+                #.  Copy/Paste from column B to fill in the blanks in column A.
                 #.  Columns A & B should now have the same text.
             #.  If it is column B (fewer services or repositories in the latest
                 data):
