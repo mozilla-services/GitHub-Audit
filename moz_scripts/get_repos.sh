@@ -12,7 +12,10 @@ METADATA_PATH=services/metadata
 if [[ ! -d $CLONE_DIR ]]; then
     git clone --depth 1 $CLONE_URL $CLONE_DIR &>/dev/null
 else
-    git --git-dir $CLONE_DIR/.git pull &>/dev/null
+    cd $CLONE_DIR
+    git fetch --depth 1 &>/dev/null    # fetch latest
+    git reset --hard HEAD &>/dev/null  # ensure no mods
+    git checkout origin/master &>/dev/null # get latest
 fi
 
 for f in $CLONE_DIR/$METADATA_PATH/*json; do
