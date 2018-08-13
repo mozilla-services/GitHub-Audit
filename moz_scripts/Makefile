@@ -10,6 +10,7 @@ SERVICE_ORGS := \
 	mozilla \
 	mozilla-bteam \
 	mozilla-conduit \
+	mozilla-frontend-infra \
 	mozilla-mobile \
 	mozilla-releng \
 	mozilla-services \
@@ -17,7 +18,6 @@ SERVICE_ORGS := \
 
 OTHER_ORGS := \
 	mozilla-b2g \
-	mozilla-frontend-infra \
 	mozilla-neutrino \
 	mozilla-partners \
 	mozilla-platform-ops \
