@@ -85,7 +85,7 @@ open_protected_issues: consolidated.csv
 
 store:
 	bash -c ' \
-		tmp_dir=$$(mktemp -d /tmp/$${USER}-GitHub-Audit-XXXXXX) ; \
+		tmp_dir=$$(mktemp -d /tmp/$${USER}-GitHub-Audit-git-XXXXXX) ; \
 		echo Using $$tmp_dir for work ; \
 		pushd $$tmp_dir &>/dev/null ; \
 		git clone --depth 1 git+ssh://github.com/mozilla-services/foxsec-results ; \
@@ -96,7 +96,7 @@ store:
 		git commit -am "$$(date +%F) github-configs update" ; \
 		git log -n1 --stat \
 		'
-	@echo "Manually push from $$(ls -1td /tmp/$${USER}-GitHub-Audit-*/foxsec-results/ | head -1)"
+	@echo "Manually push from $$(ls -1td /tmp/$${USER}-GitHub-Audit-git-*/foxsec-results/ | head -1)"
 	@echo "Forcing failure to ensure push done prior to anything else"
 	false
 

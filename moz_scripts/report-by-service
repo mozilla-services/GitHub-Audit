@@ -8,7 +8,6 @@ die() { warn "$@"; exit 2; }
 tmpdir=$(mktemp --tmpdir -d "$USER-${0##*/}-XXXXXX")
 warn "Files will be in $tmpdir"
 
-${prog_dir}/get_repos.sh |
 while true; do
     read line
     if [[ -n $line ]]; then
@@ -34,9 +33,9 @@ while true; do
                     $header \
                     $org_data
                 header=
-            fi >> $service_file
+            fi >> "${service_file:-$tmpdir/BAD.csv}"
         fi
     else
         break
     fi
-done
+done < <(${prog_dir}/get_repos.sh)
