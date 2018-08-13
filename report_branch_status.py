@@ -104,7 +104,7 @@ def report_repos(args, report_lines):
     writer = csv.writer(sys.stdout)
     if args.header:
         writer.writerow(Repo._fields)
-    writer.writerows(report_lines)
+    writer.writerows(sorted(report_lines, key=lambda r: r.name))
 
 
 def of_interest(args, repo_document):
