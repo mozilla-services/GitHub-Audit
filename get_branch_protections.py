@@ -319,6 +319,11 @@ def harvest_repo(repo):
             default_branch,
             json.dumps(signatures, indent=2, cls=BytesEncoder),
         )
+        # just get into database. No other action for now
+        hooks = list(ag_get_all(gh.repos[full_name].hooks.get, no_cache=True))
+        for hook in hooks:
+            ag_call(gh.repos[full_name].hooks[hook["id"]].get)
+        logger.debug("Hooks for %s: %s (%s)", full_name, len(hooks), repr(hooks))
         # the subfields might not have had changes, so don't blindly update
         if branch:
             details.update({"default_protected": bool(branch["protected"])})
