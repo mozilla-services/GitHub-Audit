@@ -31,6 +31,71 @@ Wrapper script to generate reports sorted the way we want.
 Typical Usage
 =============
 
+Athena Support
+--------------
+
+The modern data flow is to upload the collected data to S3 for processing via
+Athena. For Athena to parse the JSON, DDL must be supplied or refreshed any time
+the data significantly changes.
+
+Data Preparation
+++++++++++++++++
+
+The JSON data as collected is not in a format easily handled by Apache HIVE (the
+DDL used by Athena). Fortunately, conversion can be simply handled by `jq`, and
+the `Makefile` target `s3_prep` will handle that::
+
+    make -f moz_scripts/Makefile s3_prep
+
+Make note of the directory reported -- you'll need that below.
+
+DDL Modification
+++++++++++++++++
+
+If there are any significant changes to the data, the DDL will need to be
+regnerated and the Athena tables recreated.
+
+A "significant change" is likely to occur when a new data type is collected. For
+example, starting to collect repository hook data introduced additional elements
+into the database.
+
+.. note:: First time installation
+
+    Apache ORC, includes tools to infer an acceptable HIVE DDL from
+    (semi) arbitrary JSON. We use `org-tools`_, so you have to install that java
+    program, and write a wrapper script named `orc-tools` that will invoke it
+    properly.
+
+The Apache tool writes a HIVE dialect that is slightly different from what
+Athena supports. The differences were learned the hard way, and encapsulated in
+a giant ``sed`` expression in the Makefile.
+
+To generate new DDL, generate the S3 data (which will include any new JSON
+object structures), and then::
+
+    make -f moz_scripts/Makefile gen_ddl
+
+The output will be in ``/tmp/schema.txt`` - you will need to manually paste that
+into the Athena ``create table`` statement. Once you have the new tables
+created, run some queries to ensure the new DDL is backward compatible (it
+should be).
+
+Upload Data
++++++++++++
+
+You can now upload the data files (all the files in the directory given in the
+first step) to the correct place on S3.
+
+.. note:: Subject to Change
+
+    The correct location is still not determined.
+
+.. _org-tools: https://orc.apache.org/docs/java-tools.html
+
+Legacy Data
+-----------
+Legacy data is that stored in the foxsec-results repo, and reported from there.
+
 Updating the current reports is now a two step process: obtain the data, then
 manually update the spreadsheet.
 
