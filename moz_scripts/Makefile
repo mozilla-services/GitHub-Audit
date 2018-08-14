@@ -55,6 +55,10 @@ help:
 	@echo "  full        full workflow for service orgs"
 	@echo "  full_others full workflow for non-service orgs"
 	@echo "  full_all    full workflow for all configured orgs"
+	@echo ""
+	@echo "  s3_prep     prepare the .db.json files for upload into Athena"
+	@echo "  gen_ddl     (re)generate the HIVE DDL needed to read data into Athena"
+	@echo "              this likely needs to be done after any data additions"
 
 list:
 	@echo $(ALL_ORGS)
@@ -100,4 +104,33 @@ store:
 	@echo "Forcing failure to ensure push done prior to anything else"
 	false
 
-.PHONY: list clean get report consolidate help store
+s3_prep:
+	sh -c ' \
+		tmp_dir=$$(mktemp -d /tmp/$${USER}-GitHub-Audit-S3-XXXXXX) ; \
+		echo Using $$tmp_dir for work ; \
+		for f in *.db.json ; do \
+		  jq -erc ".GitHub[] | del(.body.commit.commit.verification)" < $$f > $$tmp_dir/$$f ; \
+		done ; \
+		wc -lc $$tmp_dir/*.db.json \
+		'
+
+gen_ddl:
+	test -d $$(ls -d /tmp/$${USER}-GitHub-Audit-S3-* | head -1)
+	bash -c ' \
+		s3_dir=$$(ls -dt /tmp/$${USER}-GitHub-Audit-S3-* | head -1) ; \
+		orc-tools json-schema -p $$s3_dir/*.db.json \
+			| sed -e "s,^  \(\S\+\):,  \`\1\` ," \
+			-e "s,-,_,g" \
+			-e "s,^\(\s\+\)\(\S\+\):,\1\`\2\`:," \
+			-e "s,\`\`,\`,g" \
+			-e "s,binary,string," \
+			-e "s,smallint,int," \
+			-e "s,timestamp,string," \
+			-e "s,tinyint,int," \
+			-e "s,uniontype<>,string," \
+			-e 1d \
+			-e "\$$s,>>,>," \
+			> /tmp/schema.txt \
+		'
+
+.PHONY: list clean get report consolidate help store s3_prep gen_ddl
