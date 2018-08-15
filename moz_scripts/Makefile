@@ -5,7 +5,6 @@
 CACHE_DIR := .cache
 
 SERVICE_ORGS := \
-	andyet \
 	bugzilla \
 	mozilla \
 	mozilla-bteam \
