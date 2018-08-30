@@ -27,6 +27,10 @@ OTHER_DBS := $(OTHER_ORGS:=.db.json)
 ALL_ORGS := $(SERVICE_ORGS) $(OTHER_ORGS)
 ALL_DBS := $(SERVICE_DBS) $(OTHER_DBS)
 
+# Sometimes we'll be working with non-current files, so allow date to be
+# overridden
+DATE := $(shell date --utc --iso )
+
 # Local Static Rules
 .PHONY: $(ALL_ORGS)
 $(ALL_DBS) : %.db.json: %
@@ -104,11 +108,12 @@ store:
 	false
 
 s3_prep:
-	sh -c ' \
+	bash -c ' \
 		tmp_dir=$$(mktemp -d /tmp/$${USER}-GitHub-Audit-S3-XXXXXX) ; \
 		echo Using $$tmp_dir for work ; \
 		for f in *.db.json ; do \
-		  jq -erc ".GitHub[] | del(.body.commit.commit.verification)" < $$f > $$tmp_dir/$$f ; \
+		    jq -erc ".GitHub[] | . + { \"date\": \"$(DATE)\" } " \
+		    < $$f > $$tmp_dir/$(DATE)-$$f ; \
 		done ; \
 		wc -lc $$tmp_dir/*.db.json \
 		'
