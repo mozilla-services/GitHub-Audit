@@ -4,10 +4,12 @@
     protection guidelines
 """
 import argparse
+import backoff
 import copy
 import json
 import logging
 import os
+import socket
 import time
 
 from agithub.GitHub import GitHub
@@ -82,6 +84,12 @@ def add_media_types(headers):
 
 
 # agithub utility functions
+@backoff.on_exception(backoff.expo, exception=socket.gaierror, max_tries=15)
+def retry_call(func, *args, **kwargs):
+    # wrapper to allow backoff
+    return func(*args, **kwargs)
+
+
 def ag_call(
     func, *args, expected_rc=None, new_only=True, headers=None, no_cache=False, **kwargs
 ):
@@ -114,7 +122,7 @@ def ag_call(
 
     if expected_rc is None:
         expected_rc = [200, 304]
-    rc, body = func(*args, **kwargs)
+    rc, body = retry_call(func, *args, **kwargs)
     # If we have new information, we want to use it (and store it unless
     # no_cache is true)
     # If we are told our existing info is ok, or there's an error, use the
@@ -450,6 +458,7 @@ def parse_args():
     DEBUG = args.debug
     if DEBUG:
         logger.setLevel(logging.DEBUG)
+        logging.getLogger("backoff").setLevel(logging.DEBUG)
     return args
 
 
@@ -457,6 +466,8 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s"
     )
+    # setup backoff logging
+    logging.getLogger("backoff").addHandler(logging.StreamHandler())
     try:
         main()
     except KeyboardInterrupt:
