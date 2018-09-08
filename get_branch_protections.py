@@ -61,13 +61,6 @@ def db_teardown(db):
     db.close()
 
 
-def update_or_insert(table, key, key_value, payload):
-    updated_docs = table.update(payload, tinydb.where(key) == key_value)
-    if not updated_docs:
-        # not in, so insert
-        table.insert(payload)
-
-
 def equals_as_lowercase(db_value, key):
     # Do case insensitive test
     return db_value.lower() == key.lower()
@@ -130,8 +123,8 @@ def ag_call(
     if rc == 200:
         doc["rc"] = rc
         doc["body"] = body
-    elif rc == 304:
-        logger.warn("can't handle 304 for {}".format(url))
+    elif rc in (202, 204, 304):
+        logger.warn("can't handle {} for {}, using older data".format(rc, url))
         body = doc.get("body", [])
     # Handle repo rename/removal corner cases
     elif rc == 301:
@@ -332,6 +325,7 @@ def harvest_repo(repo):
         for hook in hooks:
             ag_call(gh.repos[full_name].hooks[hook["id"]].get)
         logger.debug("Hooks for %s: %s (%s)", full_name, len(hooks), repr(hooks))
+        ag_call(gh.repos[full_name].stats.commit_activity.get, expected_rc=[200, 202])
         # the subfields might not have had changes, so don't blindly update
         if branch:
             details.update({"default_protected": bool(branch["protected"])})
@@ -339,8 +333,6 @@ def harvest_repo(repo):
             details.update({"protections": protection})
         if signatures:
             details.update({"signatures": signatures})
-        # update_or_insert(branch_results, 'repo', full_name,
-        #                  {'repo': full_name, 'branch': details})
     except AG_Exception:
         # Assume no branch so add no data
         pass
@@ -446,7 +438,9 @@ def parse_args():
     parser.add_argument("orgs", help="Organization", nargs="*")
     parser.add_argument("--all-orgs", help="Check all orgs", action="store_true")
     parser.add_argument("--repo", help="Only check for this repo")
-    parser.add_argument("--debug", help="Enter pdb on problem", action="store_true")
+    parser.add_argument(
+        "--debug", help="Debug log level and enter pdb on problem", action="store_true"
+    )
     args = parser.parse_args()
     if args.repo and "/" in args.repo:
         parser.error("Do not specify org in value of --repo")
@@ -472,3 +466,13 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         raise SystemExit
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+        if os.environ.get("DEBUGGER", False):
+            import pudb
+
+            pudb.set_trace()
+        # stack dump already printed, just exit
+        raise SystemExit(1)
