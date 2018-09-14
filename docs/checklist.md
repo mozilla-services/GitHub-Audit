@@ -66,6 +66,7 @@ please document that for future reference.
     Identity" in their Mozillians record, and their login added to the
     "Bio" section". ([see below](#mozillians))
 -   [ ] All GitHub accounts must use 2FA
+-   [ ] All GitHub accounts must have phone numbers removed
 -   [ ] Any member given elevated permissions to a repository should
     be told that it is their responsibility to contact organization
     owners and repository admins if they ever suspect or know that any
