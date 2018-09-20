@@ -17,7 +17,6 @@ SERVICE_ORGS := \
 
 OTHER_ORGS := \
 	mozilla-b2g \
-	mozilla-neutrino \
 	mozilla-partners \
 	mozilla-platform-ops \
 
@@ -108,15 +107,46 @@ store:
 	false
 
 s3_prep:
-	bash -c ' \
+	bash -cvx ' \
 		tmp_dir=$$(mktemp -d /tmp/$${USER}-GitHub-Audit-S3-XXXXXX) ; \
 		echo Using $$tmp_dir for work ; \
 		for f in *.db.json ; do \
 		    jq -erc ".GitHub[] | . + { \"date\": \"$(DATE)\" } " \
 		    < $$f > $$tmp_dir/$(DATE)-$$f ; \
+		    jq -erc ".| select(.body|objects)" \
+		    < $$tmp_dir/$(DATE)-$$f  > $$tmp_dir/$(DATE)-$${f%.json}.obj.json ; \
+		    jq -erc ".| select(.body|arrays)" \
+		    < $$tmp_dir/$(DATE)-$$f  > $$tmp_dir/$(DATE)-$${f%.json}.arr.json ; \
 		done ; \
 		wc -lc $$tmp_dir/*.db.json \
 		'
+
+# Now need to split into 2 files:
+# 0 [hwine@hwine-surface jq]
+# $ jq '.| select(.body|arrays)' test.json
+# {
+#   "date": "2018-09-18",
+#   "body": [
+#     1,
+#     2,
+#     3
+#   ],
+#   "time": "16:09"
+# }
+# 0 [hwine@hwine-surface jq]
+# $ jq '.| select(.body|objects)' test.json
+# {
+#   "date": "2018-09-18",
+#   "body": {
+#     "pass": 33,
+#     "fail": 22,
+#     "error": 0
+#   },
+#   "time": "16:10"
+# }
+# 0 [hwine@hwine-surface jq]
+# $
+
 
 gen_ddl:
 	test -d $$(ls -d /tmp/$${USER}-GitHub-Audit-S3-* | head -1)
