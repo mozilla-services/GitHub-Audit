@@ -73,7 +73,8 @@ get: $(SERVICE_DBS)
 get_others: $(OTHER_DBS)
 get_all: $(ALL_DBS)
 
-_full_common: report consolidate store
+#_full_common: report consolidate store
+_full_common: s3_prep s3_upload
 full: clean get _full_common
 full_others: clean get_others _full_common
 full_all: clean get_all _full_common
@@ -107,7 +108,7 @@ store:
 	false
 
 s3_prep:
-	bash -cvx ' \
+	bash -c ' \
 		tmp_dir=$$(mktemp -d /tmp/$${USER}-GitHub-Audit-S3-XXXXXX) ; \
 		echo Using $$tmp_dir for work ; \
 		for f in *.db.json ; do \
@@ -118,34 +119,27 @@ s3_prep:
 		    jq -erc ".| select(.body|arrays)" \
 		    < $$tmp_dir/$(DATE)-$$f  > $$tmp_dir/$(DATE)-$${f%.json}.arr.json ; \
 		done ; \
-		wc -lc $$tmp_dir/*.db.json \
+		wc -lc $$tmp_dir/*.db.json ; \
+		echo Using $$tmp_dir for work ; \
 		'
 
-# Now need to split into 2 files:
-# 0 [hwine@hwine-surface jq]
-# $ jq '.| select(.body|arrays)' test.json
-# {
-#   "date": "2018-09-18",
-#   "body": [
-#     1,
-#     2,
-#     3
-#   ],
-#   "time": "16:09"
-# }
-# 0 [hwine@hwine-surface jq]
-# $ jq '.| select(.body|objects)' test.json
-# {
-#   "date": "2018-09-18",
-#   "body": {
-#     "pass": 33,
-#     "fail": 22,
-#     "error": 0
-#   },
-#   "time": "16:10"
-# }
-# 0 [hwine@hwine-surface jq]
-# $
+s3_upload:
+	test -d $$(ls -d /tmp/$${USER}-GitHub-Audit-S3-* | head -1)
+	bash -cx ' \
+		s3_dir=$$(ls -dt /tmp/$${USER}-GitHub-Audit-S3-* | head -1) && \
+		pushd $$s3_dir && \
+		for f in *db.json; do \
+		    aws --profile cloudservices-aws-stage s3 cp $$f s3://foxsec-metrics/github/raw/ ; \
+		done && \
+		for f in *db.arr.json; do \
+		    aws --profile cloudservices-aws-stage s3 cp $$f s3://foxsec-metrics/github/array_json/ ; \
+		done && \
+		for f in *db.obj.json; do \
+		    aws --profile cloudservices-aws-stage s3 cp $$f s3://foxsec-metrics/github/object_json/ ; \
+		done && \
+		true \
+		'
+
 
 
 gen_ddl:
