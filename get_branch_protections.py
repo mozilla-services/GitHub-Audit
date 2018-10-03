@@ -124,7 +124,7 @@ def ag_call(
         doc["rc"] = rc
         doc["body"] = body
     elif rc in (202, 204, 304):
-        logger.warn("can't handle {} for {}, using older data".format(rc, url))
+        logger.debug("can't handle {} for {}, using older data".format(rc, url))
         body = doc.get("body", [])
     # Handle repo rename/removal corner cases
     elif rc == 301:
@@ -133,7 +133,7 @@ def ag_call(
         # for now, act like nothing is there
         body = doc.get("body", [])
     elif rc == 404 and rc not in expected_rc:
-        logger.error("No longer available or access denied: {}".format(url))
+        logger.debug("No longer available or access denied: {}".format(url))
         # TODO: Figure out what to do here. Maybe it's just that message, but
         # maybe need to delete from DB before next run
         body = doc.get("body", [])
@@ -234,7 +234,7 @@ def wait_for_ratelimit(min_karma=25, msg=None):
         if payload["resources"]["core"]["remaining"] < min_karma:
             core = payload["resources"]["core"]
             now = time.time()
-            nap = max(core["reset"] - now, 0.1)
+            nap = max(core["reset"] - now, 3.0)
             logger.info("napping for %s seconds", nap)
             if msg:
                 logger.info(msg)
