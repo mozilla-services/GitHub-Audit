@@ -333,6 +333,10 @@ class DeferredRetryQueue:
                         self.add_retry(**r)
                         url = r["method"].keywords["url"]
                         logger.warning(f"No data after {retry} retries for {url}")
+                else:
+                    logger.info(
+                        f"Data retrieved on retry {retry} for {rc['method'].keywords['url']}"
+                    )
 
 
 def harvest_repo(repo):
