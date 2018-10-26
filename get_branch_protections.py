@@ -292,7 +292,7 @@ class DeferredRetryQueue:
             logger.info(f"Data not ready - deferring call for {method.keywords['url']}")
             self.add_retry(method)
 
-    def add_retry(self, method, max_retries=3):
+    def add_retry(self, method, max_retries=3, **kwargs):
         """
         add a method (url) to retry later
         """
