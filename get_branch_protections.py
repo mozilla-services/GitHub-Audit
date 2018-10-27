@@ -238,11 +238,19 @@ def ratelimit_remaining():
 
 def wait_for_ratelimit(min_karma=25, msg=None):
     while gh:
-        payload = ag_call(gh.rate_limit.get, no_cache=True)
-        if payload["resources"]["core"]["remaining"] < min_karma:
+        rc, payload = ag_call_with_rc(gh.rate_limit.get, no_cache=True)
+        calls_remaining = payload["resources"]["core"]["remaining"]
+        if calls_remaining < min_karma:
             core = payload["resources"]["core"]
             now = time.time()
             nap = max(core["reset"] - now, 3.0)
+            if nap > 3500:
+                logger.error(
+                    f"Bad time calc: remaining: {calls_remaining}, karma: {min_karma}"
+                )
+                logger.error(
+                    f"               reset: {core['reset']}, now: {now}, nap: {nap}"
+                )
             logger.info("napping for %s seconds", nap)
             if msg:
                 logger.info(msg)
