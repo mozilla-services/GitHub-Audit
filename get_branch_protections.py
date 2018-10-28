@@ -343,7 +343,7 @@ class DeferredRetryQueue:
                         logger.warning(f"No data after {retry} retries for {url}")
                 else:
                     logger.info(
-                        f"Data retrieved on retry {retry} for {rc['method'].keywords['url']}"
+                        f"Data retrieved on retry {retry} for {r['method'].keywords['url']}"
                     )
 
 
