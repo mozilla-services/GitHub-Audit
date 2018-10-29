@@ -156,7 +156,9 @@ def ag_call_with_rc(
         doc.update({"body": body, "rc": rc, "when": last})
         last_table.upsert(doc, tinydb.where("url") == url)
 
-    if rc not in expected_rc:
+    # Ignore 204s here -- they come up for many "legit" reasons, such as
+    # repositories with no code.
+    if rc not in expected_rc + [204]:
         if DEBUG:
             import pudb
 
@@ -245,12 +247,15 @@ def wait_for_ratelimit(min_karma=25, msg=None):
             now = time.time()
             nap = max(core["reset"] - now, 3.0)
             if nap > 3500:
-                logger.error(
-                    f"Bad time calc: remaining: {calls_remaining}, karma: {min_karma}"
-                )
-                logger.error(
-                    f"               reset: {core['reset']}, now: {now}, nap: {nap}"
-                )
+                status = "FAIL"
+            else:
+                status = "pass"
+            logger.error(
+                f"{status} time calc: remaining: {calls_remaining}, karma: {min_karma}"
+            )
+            logger.error(
+                f"               reset: {core['reset']}, now: {now}, nap: {nap}"
+            )
             logger.info("napping for %s seconds", nap)
             if msg:
                 logger.info(msg)
@@ -297,7 +302,9 @@ class DeferredRetryQueue:
         """
         rc, _ = ag_call_with_rc(method, *args, **kwargs)
         if rc in self.retry_codes:
-            logger.info(f"Data not ready - deferring call for {method.keywords['url']}")
+            logger.debug(
+                f"Data not ready - deferring call for {method.keywords['url']}"
+            )
             self.add_retry(method)
 
     def add_retry(self, method, max_retries=3, **kwargs):
