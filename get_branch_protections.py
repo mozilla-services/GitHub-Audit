@@ -83,7 +83,15 @@ def retry_call(func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
-def ag_call(
+def ag_call(*args, **kwargs):
+    """
+    Support old calling convention
+    """
+    _, body = ag_call_with_rc(*args, **kwargs)
+    return body
+
+
+def ag_call_with_rc(
     func, *args, expected_rc=None, new_only=True, headers=None, no_cache=False, **kwargs
 ):
     """
@@ -148,7 +156,9 @@ def ag_call(
         doc.update({"body": body, "rc": rc, "when": last})
         last_table.upsert(doc, tinydb.where("url") == url)
 
-    if rc not in expected_rc:
+    # Ignore 204s here -- they come up for many "legit" reasons, such as
+    # repositories with no code.
+    if rc not in expected_rc + [204]:
         if DEBUG:
             import pudb
 
@@ -156,7 +166,7 @@ def ag_call(
         else:
             logger.error("{} for {}".format(rc, url))
             raise AG_Exception
-    return body
+    return rc, body
 
 
 def ag_get_all(func, *orig_args, **orig_kwargs):
@@ -230,11 +240,22 @@ def ratelimit_remaining():
 
 def wait_for_ratelimit(min_karma=25, msg=None):
     while gh:
-        payload = ag_call(gh.rate_limit.get, no_cache=True)
-        if payload["resources"]["core"]["remaining"] < min_karma:
+        rc, payload = ag_call_with_rc(gh.rate_limit.get, no_cache=True)
+        calls_remaining = payload["resources"]["core"]["remaining"]
+        if calls_remaining < min_karma:
             core = payload["resources"]["core"]
             now = time.time()
             nap = max(core["reset"] - now, 3.0)
+            if nap > 3500:
+                status = "FAIL"
+            else:
+                status = "pass"
+            logger.error(
+                f"{status} time calc: remaining: {calls_remaining}, karma: {min_karma}"
+            )
+            logger.error(
+                f"               reset: {core['reset']}, now: {now}, nap: {nap}"
+            )
             logger.info("napping for %s seconds", nap)
             if msg:
                 logger.info(msg)
@@ -256,6 +277,81 @@ Pseudo_code = """
 # SHH, globals, don't tell anyone
 gh = None
 last_table = None
+
+
+class DeferredRetryQueue:
+    """
+    Some data isn't ready on first probe, and will return an HTTP result code
+    indicating that. Queue those up for later execution.
+
+    Can only be used on calls that do not process the body immediately.
+    """
+
+    def __init__(self, retry_codes=None):
+        try:
+            iter(retry_codes)
+        except TypeError:
+            # add additional context to error
+            raise TypeError("Need a list for 'rc_codes'")
+        self.retry_codes = retry_codes
+        self.queue = []
+
+    def call_with_retry(self, method, *args, **kwargs):
+        """
+        Make the call - add to retry queue if rc code matches
+        """
+        rc, _ = ag_call_with_rc(method, *args, **kwargs)
+        if rc in self.retry_codes:
+            logger.debug(
+                f"Data not ready - deferring call for {method.keywords['url']}"
+            )
+            self.add_retry(method)
+
+    def add_retry(self, method, max_retries=5, **kwargs):
+        """
+        add a method (url) to retry later
+        """
+        retriable = {
+            "method": method,
+            "max_retries": max_retries,
+            "last_time": time.time(),
+        }
+        self.queue.append(retriable)
+
+    def retry_waiting(self):
+        """
+        Walk queue, retry each call, retry again if get 202
+
+        If still not successful, return member to queue
+        """
+        needs_retry = self.queue
+        self.queue = []
+        retry = 0
+        while needs_retry:
+            retry += 1
+            remaining = needs_retry
+            needs_retry = []
+            for r in remaining:
+                now = time.time()
+                not_before = r["last_time"] + 5 * retry
+                if not_before > now:
+                    nap_seconds = int(not_before - now) + 1
+                    logger.info(f"waiting {nap_seconds:d} before retry")
+                    time.sleep(int(not_before - now) + 1)
+                rc, _ = ag_call_with_rc(r["method"], expected_rc=[200, 202])
+                if rc in self.retry_codes:
+                    # still not ready
+                    if retry < r["max_retries"]:
+                        needs_retry.append(r)
+                    else:
+                        # put back on queue, since not finished
+                        self.add_retry(**r)
+                        url = r["method"].keywords["url"]
+                        logger.warning(f"No data after {retry} retries for {url}")
+                else:
+                    logger.info(
+                        f"Data retrieved on retry {retry} for {r['method'].keywords['url']}"
+                    )
 
 
 def harvest_repo(repo):
@@ -325,7 +421,8 @@ def harvest_repo(repo):
         for hook in hooks:
             ag_call(gh.repos[full_name].hooks[hook["id"]].get)
         logger.debug("Hooks for %s: %s (%s)", full_name, len(hooks), repr(hooks))
-        ag_call(gh.repos[full_name].stats.commit_activity.get, expected_rc=[200, 202])
+        method = gh.repos[full_name].stats.commit_activity.get
+        org_queue.call_with_retry(method, expected_rc=[200, 202])
         # the subfields might not have had changes, so don't blindly update
         if branch:
             details.update({"default_protected": bool(branch["protected"])})
@@ -359,6 +456,8 @@ def harvest_org(org_name):
     for repo in repo_fetcher():
         repo_data = harvest_repo(repo)
         org_data.update(repo_data)
+    # process any pending
+    org_queue.retry_waiting()
     return org_data
 
 
@@ -395,6 +494,8 @@ def process_orgs(args=None, collected_as=None):
         logger.info(
             "Starting on org %s." " (calls remaining %s).", org, ratelimit_remaining()
         )
+        global org_queue
+        org_queue = DeferredRetryQueue(retry_codes=[202])
         try:
             db = None
             db = db_setup(org)
@@ -404,9 +505,14 @@ def process_orgs(args=None, collected_as=None):
             if args.repo:
                 logger.info("Only processing repo %s", args.repo)
                 repo = ag_call(gh.repos[org][args.repo].get)
-                org_data = harvest_repo(repo)
+                if repo:
+                    org_data = harvest_repo(repo)
+                else:
+                    logger.fatal(f"no repo {args.repo} in org {org}")
+                    raise ValueError
             else:
                 org_data = harvest_org(org)
+            org_queue.retry_waiting()
             results.update(org_data)
         finally:
             if db is not None:
