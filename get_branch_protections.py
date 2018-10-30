@@ -307,7 +307,7 @@ class DeferredRetryQueue:
             )
             self.add_retry(method)
 
-    def add_retry(self, method, max_retries=3, **kwargs):
+    def add_retry(self, method, max_retries=5, **kwargs):
         """
         add a method (url) to retry later
         """
