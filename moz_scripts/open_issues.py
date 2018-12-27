@@ -77,6 +77,8 @@ def ag_call(
         body = []
         # don't throw on this one
         expected_rc.append(rc)
+    elif rc == 422 and rc not in expected_rc:
+        logger.error(f"Unprocessable Entity: {url} {query_string()}")
     logger.debug("{} for {}".format(rc, url))
 
     if rc not in expected_rc:
@@ -151,7 +153,7 @@ def wait_for_ratelimit(min_karma=25, msg=None, usingSearch=False):
         napped = False
         if resource["remaining"] < min_karma:
             now = time.time()
-            nap = max(resource["reset"] - now, 0.1)
+            nap = max(resource["reset"] - now, 1)
             logger.info("napping for %s seconds", nap)
             if msg:
                 logger.info(msg)
@@ -240,22 +242,28 @@ def find_existing_issue(owner, repo, term):
     q += " repo:{}/{}".format(owner, repo)
     kwargs = {"q": q}
     wait_for_ratelimit(usingSearch=True)
-    for body in ag_get_all(gh.search.issues.get, **kwargs):
-        if "items" not in body:
-            # 403 or something we don't expect
-            logger.error("Unexpected keys: {}".format(" ".join(body.keys())))
-            break
-        issue_count = len(body["items"])
-        logger.debug("items in body: {}".format(issue_count))
-        if issue_count > 1:
-            logger.error(
-                "Unexpected Issue Count {} for {}/{}".format(issue_count, owner, repo)
-            )
-        for match in body["items"]:
-            state = match["state"]
-            number = match["number"]
-            return number, state
-        wait_for_ratelimit(usingSearch=True)
+    try:
+        for body in ag_get_all(gh.search.issues.get, **kwargs):
+            if "items" not in body:
+                # 403 or something we don't expect
+                logger.error("Unexpected keys: {}".format(" ".join(body.keys())))
+                continue
+            issue_count = len(body["items"])
+            logger.debug("items in body: {}".format(issue_count))
+            if issue_count > 1:
+                logger.error(
+                    "Unexpected Issue Count {} for {}/{}".format(
+                        issue_count, owner, repo
+                    )
+                )
+            for match in body["items"]:
+                state = match["state"]
+                number = match["number"]
+                return number, state
+            wait_for_ratelimit(usingSearch=True)
+    except AG_Exception:
+        # We assume it's a bad repo, but let other repos process
+        pass
     raise NoIssue
 
 
@@ -344,7 +352,7 @@ def load_messages(file_name):
 
 def main(driver=None):
     args = parse_args()
-    msg_id = args.id
+    std_id = args.id
     global gh
     gh = get_github_client()
     wait_for_ratelimit(usingSearch=True)
@@ -358,17 +366,16 @@ def main(driver=None):
     load_messages(args.message_file or MESSAGES_FILE)
     for repo_full_name in args.repos:
         logger.info("Starting on {}".format(repo_full_name))
-        wait_for_ratelimit(usingSearch=True)
+        wait_for_ratelimit()
         owner, repo = repo_full_name.split("/")
+        # Get message subject
+        msg_id = next_message_id(std_id, None)
+        subject, _ = get_message(None, None, msg_id)
         try:
-            issue, state = find_existing_issue(
-                owner,
-                repo,
-                "FYI: Renovate will auto open PRs for vulnerabilities on 2018-08-08",
-            )
-            update_issue(owner, repo, msg_id, issue, state)
+            issue, state = find_existing_issue(owner, repo, subject)
+            update_issue(owner, repo, std_id, issue, state)
         except NoIssue:
-            create_issue(owner, repo, msg_id)
+            create_issue(owner, repo, std_id)
     logger.info("Done with {} API calls remaining".format(ratelimit_remaining()))
 
 
