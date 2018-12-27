@@ -45,7 +45,7 @@ Messages:
 
             [protect_url]: https://github.com/{owner}/{repo}/settings/branches
 
-            [email]: <mailto:secops+github@mozilla.com?subject={msg_id}+Question+re+{owner}/{repo}>
+            [email]: <mailto:secops+gh001@mozilla.com?subject={msg_id}+Question+re+{owner}/{repo}>
 
     SOGH0002:
         title: *protected_branch_title

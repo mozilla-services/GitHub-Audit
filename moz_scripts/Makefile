@@ -13,9 +13,11 @@ SERVICE_ORGS := \
 	mozilla-mobile \
 	mozilla-releng \
 	mozilla-services \
+	mozilla-taiwan \
 	taskcluster \
 
 OTHER_ORGS := \
+	andyet \
 	mozilla-b2g \
 	mozilla-partners \
 	mozilla-platform-ops \
@@ -46,8 +48,6 @@ help:
 	@echo "  report      build the per-service reports"
 	@echo "  consolidate gather all per-service reports for spreadsheet import"
 	@echo "              into consolidate.csv"
-	@echo "  store       store latest data into foxsec-results"
-	@echo "              (manual push required)"
 	@echo "  preview_new_issues     show what open_protected_issues would do"
 	@echo "  open_protected_issues  open GitHub issues on repositories which"
 	@echo "                         do not have branch protection enabled"
@@ -60,8 +60,7 @@ help:
 	@echo "  full_all    full workflow for all configured orgs"
 	@echo ""
 	@echo "  s3_prep     prepare the .db.json files for upload into Athena"
-	@echo "  gen_ddl     (re)generate the HIVE DDL needed to read data into Athena"
-	@echo "              this likely needs to be done after any data additions"
+	@echo "  s3_upload   upload the .db.json files to S3
 
 list:
 	@echo $(ALL_ORGS)
@@ -85,31 +84,14 @@ report:
 
 consolidated.csv \
 consolidate:
-	@# force the sort order we want
-	env LANG=en_US.UTF-8 bash -c 'cat $$(ls -1td /tmp/$$USER-report-by-service-* | head -1)/*.csv' >consolidated.csv
+	@echo "You must manually copy the latest report CSV to consolidated.csv"
+	@false
 
 preview_new_issues: consolidated.csv
-	moz_scripts/open_issues.py --dry-run $$(grep '/' consolidated.csv | cut -d, -f1,3 | grep False$$ | cut -d, -f1)
+	moz_scripts/open_issues.py --dry-run $$(grep '/' consolidated.csv | cut -d, -f1,2 --output-delimiter '/')
 
 open_protected_issues: consolidated.csv
-	moz_scripts/open_issues.py $$(grep '/' consolidated.csv | cut -d, -f1,3 | grep False$$ | cut -d, -f1)
-
-store:
-	bash -c ' \
-		tmp_dir=$$(mktemp -d /tmp/$${USER}-GitHub-Audit-git-XXXXXX) ; \
-		echo Using $$tmp_dir for work ; \
-		pushd $$tmp_dir &>/dev/null ; \
-		git clone --depth 1 git+ssh://github.com/mozilla-services/foxsec-results ; \
-		cd foxsec-results/github-configs ; \
-		for f in ~1/*.db.json ; do \
-		  jq . < $$f > $${f##*/} ; \
-		done ; \
-		git commit -am "$$(date +%F) github-configs update" ; \
-		git log -n1 --stat \
-		'
-	@echo "Manually push from $$(ls -1td /tmp/$${USER}-GitHub-Audit-git-*/foxsec-results/ | head -1)"
-	@echo "Forcing failure to ensure push done prior to anything else"
-	false
+	moz_scripts/open_issues.py           $$(grep '/' consolidated.csv | cut -d, -f1,2 --output-delimiter '/')
 
 s3_prep:
 	bash -c ' \
@@ -165,4 +147,4 @@ gen_ddl:
 			> /tmp/schema.txt \
 		'
 
-.PHONY: list clean get report consolidate help store s3_prep gen_ddl
+.PHONY: list clean get report consolidate help s3_prep gen_ddl

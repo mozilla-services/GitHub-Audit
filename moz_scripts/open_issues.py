@@ -146,18 +146,27 @@ def ratelimit_remaining():
     return body["resources"]["core"]["remaining"]
 
 
-def wait_for_ratelimit(min_karma=25, msg=None):
-    while gh:
-        payload = ag_call(gh.rate_limit.get, no_cache=True)
-        if payload["resources"]["core"]["remaining"] < min_karma:
-            core = payload["resources"]["core"]
+def wait_for_ratelimit(min_karma=25, msg=None, usingSearch=False):
+    def nap_if_needed(resource, min_karma, msg=None):
+        napped = False
+        if resource["remaining"] < min_karma:
             now = time.time()
-            nap = max(core["reset"] - now, 0.1)
+            nap = max(resource["reset"] - now, 0.1)
             logger.info("napping for %s seconds", nap)
             if msg:
                 logger.info(msg)
             time.sleep(nap)
-        else:
+            napped = True
+        return napped
+
+    # repeat until good on all channels
+    while gh:
+        payload = ag_call(gh.rate_limit.get, no_cache=True)
+        napped = nap_if_needed(payload["resources"]["core"], min_karma, msg)
+        if usingSearch:
+            napped = nap_if_needed(payload["resources"]["search"], 1, msg) or napped
+
+        if not napped:
             break
 
 
@@ -230,6 +239,7 @@ def find_existing_issue(owner, repo, term):
     q = term + " is:issue"
     q += " repo:{}/{}".format(owner, repo)
     kwargs = {"q": q}
+    wait_for_ratelimit(usingSearch=True)
     for body in ag_get_all(gh.search.issues.get, **kwargs):
         if "items" not in body:
             # 403 or something we don't expect
@@ -245,6 +255,7 @@ def find_existing_issue(owner, repo, term):
             state = match["state"]
             number = match["number"]
             return number, state
+        wait_for_ratelimit(usingSearch=True)
     raise NoIssue
 
 
@@ -336,7 +347,7 @@ def main(driver=None):
     msg_id = args.id
     global gh
     gh = get_github_client()
-    wait_for_ratelimit()
+    wait_for_ratelimit(usingSearch=True)
     body = ag_call(gh.user.get)
     collected_as = body["login"]
     logger.info(
@@ -347,6 +358,7 @@ def main(driver=None):
     load_messages(args.message_file or MESSAGES_FILE)
     for repo_full_name in args.repos:
         logger.info("Starting on {}".format(repo_full_name))
+        wait_for_ratelimit(usingSearch=True)
         owner, repo = repo_full_name.split("/")
         try:
             issue, state = find_existing_issue(
