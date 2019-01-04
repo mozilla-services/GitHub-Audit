@@ -13,6 +13,7 @@ SERVICE_ORGS := \
 	mozilla-mobile \
 	mozilla-releng \
 	mozilla-services \
+	mozilla-tw \
 	taskcluster \
 
 OTHER_ORGS := \
