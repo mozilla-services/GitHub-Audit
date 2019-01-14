@@ -82,12 +82,16 @@ please document that for future reference.
 -   [ ] Committing (or merging) to a production branch should be
     limited to the smallest reasonable set of people.
 -   [ ] Branch protection should be enabled for production branches
+        [Branch Protection Help][]
 -   [ ] Branch protections should always apply to administrators as
     well.
+        [Branch Protection Help][]
 -   [ ] Commits (including merges) to the production branch should be
     GPG signed.
+        [GPG Signing][]
 -   [ ] Important milestones, such as releases, should be marked by a
     signed tag.
+        [GPG Signing][]
 -   [ ] Important milestone achievement criteria should include an audit
     all relevant verified commits.
 -   [ ] Elevated permissions should be granted to teams, not
@@ -127,10 +131,21 @@ The other recommendations should follow as soon as practical.
 - [Threat Model](threat.md) gives more details on how a hijacked 3rd
   party app might be able to gain additional user permissions.
 
-- [Attack Sequence](graph.md) 
+- [Attack Sequence](graph.md)
 
 - <span id="mozillians">Support for GitHub login names.</span>
 
   Currently, it is not possible to enter a GitHub login in a manner that
   is programatically retrievable. Bugs are on file to remedy this, but
   the feature has not yet been deployed.
+
+- GitHub documentation of interest:
+    - [Commit Restrictions][]
+    - [Branch Protection Help][]
+    - [GPG Signing][] for commits and tags
+
+
+
+[Branch Protection Help]: https://help.github.com/articles/configuring-protected-branches/
+[GPG Signing]: https://help.github.com/articles/about-required-commit-signing
+[Commit Restrictions]: https://help.github.com/articles/about-branch-restrictions/
