@@ -12,11 +12,17 @@
 
 Standards:
   - standard number: 1
-    standard description: Production branches should be protected
-    new message id: SOGH0001
-    reopen message id: SOGH0002
-    still open message id: SOGH0003
-    admin set: SOGH0004
+    standard description: Production branch never protected
+    new message id: SOGH001-0
+    reopen message id: SOGH001-1
+    still open message id: SOGH001-2
+    admin set: SOGH001-3
+  - standard number: 2
+    standard description: Regression in Production branch protection
+    new message id: SOGH002-0
+    reopen message id: SOGH002-1
+    still open message id: SOGH002-2
+    admin set: SOGH002-3
 
 # Messages will be interpolated at run time. Variables available
 # include:
@@ -24,22 +30,31 @@ Standards:
 #   repo  - repository name
 #   msg_id  - the message id from the standards section
 Messages:
-    SOGH0001:
+    # For repositories that have never had the setting enabled.
+    SOGH001-0:
         title: &protected_branch_title "Set protected status on production branch"
         message: &protected_branch_message >
-            The production branch on this repository is not protected against
-            force pushes. This setting is recommended as part of [Mozilla's
-            Guidelines][guidelines_url] for a Sensitive Repository.
+            Hello! This is your neighborhood secops team looking out for you!
+
+
+            The production branch on this repository is not
+            protected against force pushes. This setting is recommended
+            as part of [Mozilla's Guidelines][guidelines_url] for a
+            Sensitive Repository.
+
 
             **Anyone with admin permissions for this repository can correct the
             setting using [this URL][protect_url].**
 
+
             If you have any questions, or believe this issue was opened in
             error, please contact [us][email] and mention {msg_id} and this repository.
 
+
             Thank you for your prompt attention to this issue.
 
-            --Firefox Security Operations team
+            --Firefox Operations Security team
+
 
             [guidelines_url]: https://wiki.mozilla.org/GitHub/Repository_Security
 
@@ -47,14 +62,86 @@ Messages:
 
             [email]: <mailto:secops+gh001@mozilla.com?subject={msg_id}+Question+re+{owner}/{repo}>
 
-    SOGH0002:
+    SOGH001-1:
+        title: *protected_branch_title
+        message: &protected_branch_reopen_message >
+            Hello! This is your neighborhood secops team still looking out for you!
+
+
+            The production branch on this repository is still not
+            protected against force pushes. If the repository's
+            production branches are not set as the GitHub default, please fill out
+            [this form](https://docs.google.com/forms/d/e/1FAIpQLScbOGCBZJ0xDpwGUyPYpdRMGl2doOh4qT7iSVvwxjXRvT6YWQ/viewform?usp=sf_link).
+
+
+            If you have any questions, or believe this issue was opened in
+            error, please contact [us][email] and mention {msg_id} and this repository.
+
+
+            Thank you for your prompt attention to this issue.
+
+            --Firefox Operations Security team
+
+
+            [guidelines_url]: https://wiki.mozilla.org/GitHub/Repository_Security
+
+            [protect_url]: https://github.com/{owner}/{repo}/settings/branches
+
+            [email]: <mailto:secops+gh001@mozilla.com?subject={msg_id}+Question+re+{owner}/{repo}>
+
+    SOGH001-2:
+        title: *protected_branch_title
+        message: *protected_branch_reopen_message
+
+    SOGH001-3:
         title: *protected_branch_title
         message: *protected_branch_message
 
-    SOGH0003:
-        title: *protected_branch_title
-        message: *protected_branch_message
+    # For repositories that have have regressed the setting.
+    SOGH002-0:
+        title: &protected_branch_regression_title "Resenable protected status on production branch"
+        message: &protected_branch_regression_message >
+            Hello! This is your neighborhood secops team looking out for you!
 
-    SOGH0004:
-        title: *protected_branch_title
-        message: *protected_branch_message
+
+            The production branch on this repository is no longer
+            protected against force pushes. This setting is recommended
+            as part of [Mozilla's Guidelines][guidelines_url] for a
+            Sensitive Repository.
+
+
+            Branch protection had been configured previous for this
+            repository, so you may want to check how the setting became
+            unchecked.
+
+
+            **Anyone with admin permissions for this repository can correct the
+            setting using [this URL][protect_url].**
+
+
+            If you have any questions, or believe this issue was opened in
+            error, please contact [us][email] and mention {msg_id} and this repository.
+
+
+            Thank you for your prompt attention to this issue.
+
+            --Firefox Operations Security team
+
+
+            [guidelines_url]: https://wiki.mozilla.org/GitHub/Repository_Security
+
+            [protect_url]: https://github.com/{owner}/{repo}/settings/branches
+
+            [email]: <mailto:secops+gh002@mozilla.com?subject={msg_id}+Question+re+{owner}/{repo}>
+
+    SOGH002-1:
+        title: *protected_branch_regression_title
+        message: *protected_branch_regression_message
+
+    SOGH002-2:
+        title: *protected_branch_regression_title
+        message: *protected_branch_regression_message
+
+    SOGH002-3:
+        title: *protected_branch_regression_title
+        message: *protected_branch_regression_message
