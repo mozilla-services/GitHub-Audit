@@ -192,45 +192,20 @@ gh = None
 messages = None
 
 
-def matching_repos(scope, term):
-    """
-    Generator for repositories containing term
-    """
-    q = term + " in:file"
-    if "/" in scope:
-        q += " repo:{}".format(scope)
-    else:
-        q += " user:{}".format(scope)
-    kwargs = {"q": q}
-    found_repos = set()
-    for body in ag_get_all(gh.search.code.get, **kwargs):
-        if "items" not in body:
-            # 403 or something we don't expect
-            logger.error("Unexpected keys: {}".format(" ".join(body.keys())))
-            break
-        logger.debug("items in body: {}".format(len(body["items"])))
-        for match in body["items"]:
-            repo = match["repository"]["full_name"]
-            if repo not in found_repos:
-                found_repos.add(repo)
-                yield repo
-            else:
-                logger.debug("another hit for {}".format(repo))
-
-
 class NoIssue(Exception):
     pass
 
 
-def get_message(owner, repo, msg_id):
+def get_message(owner, repo, msg_id, **kwargs):
     """
     Return a fully expanded message body & title
     """
-    title = messages["Messages"][msg_id]["title"].format(**locals())
-    message = messages["Messages"][msg_id]["message"].format(**locals())
+    template_values = {}
+    template_values.update(locals())
+    template_values.update(kwargs)
+    title = messages["Messages"][msg_id]["title"].format(**template_values)
+    message = messages["Messages"][msg_id]["message"].format(**template_values)
 
-    logger.debug("title: '%s'", title)
-    logger.debug("message: '%s'", message)
     return title, message
 
 
@@ -274,7 +249,7 @@ def update_issue(owner, repo, standard_id, issue, state):
         ToDo: consider different message text when reopening
               maybe prepend "REOPENED: " to title?
     """
-    logger.debug("Reusing {} for {}/{}".format(issue, owner, repo))
+    logger.info(f"Reusing https://github.com/{owner}/{repo}/issues/{issue}")
     msg_id = next_message_id(standard_id, state)
     _, text = get_message(owner, repo, msg_id)
     # open bug in case it was closed
@@ -323,6 +298,7 @@ def next_message_id(standard_id, issue_state, force=False):
         )
     except (IndexError, KeyError):
         logger.error("YAML access error for std {}".format(standard_id))
+        raise SystemExit
     return next_id
 
 
@@ -340,9 +316,11 @@ def create_issue(owner, repo, standard_id):
     if DRY_RUN:
         # multiple calls, all debug info out already, so bail
         return
-    status, _ = func(body=payload)
+    status, response_body = func(body=payload)
     if status not in [201]:
         logger.error("Issue not opened for %(url)s status %(status)s", locals())
+    else:
+        logger.info("Opened {}".format(response_body["url"]))
 
 
 def load_messages(file_name):
@@ -384,7 +362,7 @@ def parse_args():
     parser.add_argument(
         "repos", help="owner/repo to open issue on", nargs="+", metavar="org/repo"
     )
-    parser.add_argument("--id", help="Message ID for new bugs", default="1")
+    parser.add_argument("--id", help="Message ID for new bugs (default 1)", default="1")
     parser.add_argument("--message-file", help="YAML file with messages")
     parser.add_argument("--debug", help="log at DEBUG level", action="store_true")
     parser.add_argument("--dry-run", help="Do not open issues", action="store_true")
