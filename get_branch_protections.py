@@ -91,6 +91,7 @@ def ag_call(*args, **kwargs):
     return body
 
 
+@backoff.on_exception(backoff.expo, exception=AG_Exception, max_tries=5)
 def ag_call_with_rc(
     func, *args, expected_rc=None, new_only=True, headers=None, no_cache=False, **kwargs
 ):
