@@ -495,7 +495,8 @@ def process_orgs(args=None, collected_as=None):
             "Starting on org %s." " (calls remaining %s).", org, ratelimit_remaining()
         )
         global org_queue
-        org_queue = DeferredRetryQueue(retry_codes=[202])
+        # Accept (assumed transitory) GitHub glitch codes as retry requests
+        org_queue = DeferredRetryQueue(retry_codes=[202, 403, 502])
         try:
             db = None
             db = db_setup(org)
