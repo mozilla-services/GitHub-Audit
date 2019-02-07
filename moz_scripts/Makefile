@@ -5,7 +5,6 @@
 CACHE_DIR := .cache
 
 SERVICE_ORGS := \
-	bugzilla \
 	mozilla \
 	mozilla-bteam \
 	mozilla-conduit \
