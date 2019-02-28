@@ -10,6 +10,7 @@ SERVICE_ORGS := \
 	mozilla-conduit \
 	mozilla-frontend-infra \
 	mozilla-mobile \
+	mozilla-mobile-skunkworks \
 	mozilla-releng \
 	mozilla-services \
 	mozilla-tw \
