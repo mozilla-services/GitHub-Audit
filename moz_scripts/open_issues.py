@@ -153,7 +153,7 @@ def wait_for_ratelimit(min_karma=25, msg=None, usingSearch=False):
         napped = False
         if resource["remaining"] < min_karma:
             now = time.time()
-            nap = max(resource["reset"] - now, 1)
+            nap = max(resource["reset"] - int(now), 0) + 1
             logger.info("napping for %s seconds", nap)
             if msg:
                 logger.info(msg)
@@ -320,7 +320,7 @@ def create_issue(owner, repo, standard_id):
     if status not in [201]:
         logger.error("Issue not opened for %(url)s status %(status)s", locals())
     else:
-        logger.info("Opened {}".format(response_body["url"]))
+        logger.info("Opened {}".format(response_body["html_url"]))
 
 
 def load_messages(file_name):
@@ -365,7 +365,7 @@ def parse_args():
     parser.add_argument("--id", help="Message ID for new bugs (default 1)", default="1")
     parser.add_argument("--message-file", help="YAML file with messages")
     parser.add_argument("--debug", help="log at DEBUG level", action="store_true")
-    parser.add_argument("--dry-run", help="Do not open issues", action="store_true")
+    parser.add_argument("--open-issues", help="Open issues", action="store_true")
     args = parser.parse_args()
 
     # validate repos are org/repo
@@ -374,8 +374,8 @@ def parse_args():
         parser.error("Bad '/' usage in repos: {}".format(", ".join(bad_args)))
 
     global DEBUG, DRY_RUN
-    DRY_RUN = args.dry_run
-    DEBUG = args.debug or DRY_RUN
+    DRY_RUN = not args.open_issues
+    DEBUG = args.debug
     if DEBUG:
         logger.setLevel(logging.DEBUG)
     return args
