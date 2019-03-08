@@ -17,7 +17,6 @@ SERVICE_ORGS := \
 	taskcluster \
 
 OTHER_ORGS := \
-	andyet \
 	mozilla-b2g \
 	mozilla-partners \
 	mozilla-platform-ops \
@@ -60,7 +59,7 @@ help:
 	@echo "  full_all    full workflow for all configured orgs"
 	@echo ""
 	@echo "  s3_prep     prepare the .db.json files for upload into Athena"
-	@echo "  s3_upload   upload the .db.json files to S3
+	@echo "  s3_upload   upload the .db.json files to S3"
 
 list:
 	@echo $(ALL_ORGS)
@@ -88,10 +87,10 @@ consolidate:
 	@false
 
 preview_new_issues: consolidated.csv
-	moz_scripts/open_issues.py --dry-run $$(grep '/' consolidated.csv | cut -d, -f1,2 --output-delimiter '/')
+	moz_scripts/open_issues.py               $$(grep '/' consolidated.csv | cut -d, -f1,2 --output-delimiter '/')
 
 open_protected_issues: consolidated.csv
-	moz_scripts/open_issues.py           $$(grep '/' consolidated.csv | cut -d, -f1,2 --output-delimiter '/')
+	moz_scripts/open_issues.py --open-issues $$(grep '/' consolidated.csv | cut -d, -f1,2 --output-delimiter '/')
 
 s3_prep:
 	bash -c ' \
