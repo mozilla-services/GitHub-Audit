@@ -422,8 +422,14 @@ def harvest_repo(repo):
         for hook in hooks:
             ag_call(gh.repos[full_name].hooks[hook["id"]].get)
         logger.debug("Hooks for %s: %s (%s)", full_name, len(hooks), repr(hooks))
+        # activity metrics are "best effort", so don't bail on
+        # exceptions
         method = gh.repos[full_name].stats.commit_activity.get
-        org_queue.call_with_retry(method, expected_rc=[200, 202])
+        try:
+            org_queue.call_with_retry(method, expected_rc=[200, 202])
+        except AG_Exception as e:
+            logger.error("Fail on %s activity: %s", full_name, str(e))
+            # continue on
         # the subfields might not have had changes, so don't blindly update
         if branch:
             details.update({"default_protected": bool(branch["protected"])})
