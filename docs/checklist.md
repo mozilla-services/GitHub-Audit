@@ -56,6 +56,9 @@ The guidelines below are strongly encouraged, and may be required by
 some groups. If you have reasons for not adopting individual ones,
 please document that for future reference.
 
+Not all of the guidelines can be verified independently. Some of them
+require the user to "self report".
+
 ## Membership
 
 -   [ ] All GitHub accounts granted specific access to a sensitive
@@ -66,7 +69,8 @@ please document that for future reference.
     Identity" in their Mozillians record, and their login added to the
     "Bio" section". ([see below](#mozillians))
 -   [ ] All GitHub accounts must use 2FA
--   [ ] All GitHub accounts must have phone numbers removed
+-   [ ] All GitHub accounts with elevated permissions must have phone
+    numbers removed. (This protects against 2FA bypass using SMS reset.)
 -   [ ] Any member given elevated permissions to a repository should
     be told that it is their responsibility to contact organization
     owners and repository admins if they ever suspect or know that any
@@ -128,7 +132,7 @@ The other recommendations should follow as soon as practical.
 - [Threat Model](threat.md) gives more details on how a hijacked 3rd
   party app might be able to gain additional user permissions.
 
-- [Attack Sequence](graph.md) 
+- [Attack Sequence](graph.md)
 
 - <span id="mozillians">Support for GitHub login names.</span>
 
