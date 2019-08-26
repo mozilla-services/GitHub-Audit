@@ -314,6 +314,7 @@ def create_issue(owner, repo, standard_id):
     url = func.keywords["url"]
     logger.debug("Opening new issue via %(url)s", locals())
     if DRY_RUN:
+        print(f"  subj: {title}\n  text: {text}")
         # multiple calls, all debug info out already, so bail
         return
     status, response_body = func(body=payload)
