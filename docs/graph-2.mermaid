@@ -15,13 +15,13 @@ note over BA: Unauthorized API Access Obtained
 Note over U: Account Owned until OAuth token deleted
 BA->>GH: Insert additional SSH & GPG Public Keys
 note over BA: Unauthorized CLI Access Obtained
-BA-->>+BA:  
+BA-->>+BA:
 Note over U: Account Owned until new keys deleted
 opt Normal User <-> Repo usage, mediated by App, is normal
-    U -->> CA: 
-    CA -->>PR:  
-    PR -->>CA: 
-    CA -->>U: 
+    U -->> CA:
+    CA -->>PR:
+    PR -->>CA:
+    CA -->>U:
 end
 U -->>CA: Logout (does not revoke token)
 
@@ -34,4 +34,3 @@ note over SR: Integrity Compromised
 
 U ->>GH: Notice & delete rogue keys
 BA-->-BA: Unauthorized GitHub (cli) Access Lost
-

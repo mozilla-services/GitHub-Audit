@@ -1,4 +1,5 @@
 #/usr/bin/env bash
+# vim: et sts=4 sw=4 ai :
 
 GREP=$(which rg)
 [[ -x $GREP ]] || GREP=grep
@@ -11,11 +12,11 @@ USAGE="usage: ${0##*/} term scope...
 Show context of term in specified repos
 
 Options:
-    --grep-opts	    opts for $GREP (default: $GREP_OPTS)
-    --list-only	    skip GitHub search & clone - just search
-    --no-search	    skip GitHub search
-    --workdir	    directory to put repos in (default $WORKDIR)
-    -h|--help	    output this help
+    --grep-opts     opts for $GREP (default: $GREP_OPTS)
+    --list-only     skip GitHub search & clone - just search
+    --no-search     skip GitHub search
+    --workdir       directory to put repos in (default $WORKDIR)
+    -h|--help       output this help
 "
 
 set -eu
@@ -28,13 +29,13 @@ usage() { warn "$@" "${USAGE:-}" ; [[ $# == 0 ]] && exit 0 || exit 1;}
 # Parse options
 while [[ $# -gt 0 ]]; do
     case "$1" in
-	--grep-opts) GREP_OPTS="$2" ; shift ;;
-	--list-only) LIST_ONLY=true ;;
-	--no-search) NO_SEARCH=true ;;
-	--workdir) WORKDIR="$2" ; shift ;;
-	-h|--help) usage ;;
-	-*) usage "Unknown option '$1'" ;;
-	*) break ;;
+        --grep-opts) GREP_OPTS="$2" ; shift ;;
+        --list-only) LIST_ONLY=true ;;
+        --no-search) NO_SEARCH=true ;;
+        --workdir) WORKDIR="$2" ; shift ;;
+        -h|--help) usage ;;
+        -*) usage "Unknown option '$1'" ;;
+        *) break ;;
     esac
     shift
 done
@@ -63,15 +64,15 @@ for ((i=0; i<${#repo[@]}; i++)); do
     mkdir -p "${org_dir}" || die "Can't create '${org_dir}'"
     cd "${org_dir}"
     (
-	if $LIST_ONLY ; then
-	    cd "${repo_dir}"
-	elif [[ -d "${repo}" ]] ; then
-	    cd "${repo_dir}"
-	    git pull --depth 1 
-	else
-	    git clone --depth 1 https://github.com/$r
-	    cd "${repo_dir}"
-	fi
+        if $LIST_ONLY ; then
+            cd "${repo_dir}"
+        elif [[ -d "${repo}" ]] ; then
+            cd "${repo_dir}"
+            git pull --depth 1
+        else
+            git clone --depth 1 https://github.com/$r
+            cd "${repo_dir}"
+        fi
         rg $GREP_OPTS "$term" .
     )
 done
