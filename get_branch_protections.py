@@ -580,7 +580,7 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         raise SystemExit
-    except Exception as e:
+    except Exception:
         import traceback
 
         traceback.print_exc()
