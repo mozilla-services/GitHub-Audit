@@ -117,8 +117,8 @@ require a user to "self report".
 
 ### Ongoing Operations
 
--   [ ] A developer should be designated to triage all reported supply
-    chain vulnerabilities.
+-   [ ] A developer should be designated to triage all reported
+    dependency vulnerability alerts.
 -   [ ] When appropriate, vulnerabilities which do not apply to the
     usage in that repository should be resolved with the reason
     documented.
