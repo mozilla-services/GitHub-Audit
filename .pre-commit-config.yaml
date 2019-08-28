@@ -12,6 +12,9 @@ repos:
     -   id: check-added-large-files
     -   id: check-ast
     -   id: flake8
+        # we set flake8 line length to much bigger than black (88), as
+        # black sometimes exceeeds it's limit
+        args: [--max-line-length=131]
 -   repo: https://github.com/ambv/black
     rev: 19.3b0
     hooks:
