@@ -17,24 +17,24 @@ jq --raw-output <"$tmp_file" \
     'to_entries[] | select(.key | contains("/")) |
 select(.value.default_protected)
     |  [.key, .value.protected_branch_count, .value.default_branch, "good" ]
-    | @csv ' 
+    | @csv '
 jq --raw-output <"$tmp_file" \
-    '.| [ keys[] as $k | select(.[$k].default_protected==true) 
+    '.| [ keys[] as $k | select(.[$k].default_protected==true)
     |  [.repository, .protected_branch_count, .default_branch, "good" ] ]
-    | @csv ' 
+    | @csv '
 
 echo ""
 echo "Repositories with non-default branch(es) protected:"
 jq --raw-output <"$tmp_file" \
-    'select(.default_protected==false and .protected_branch_count>=1) 
+    'select(.default_protected==false and .protected_branch_count>=1)
     |  [.repository, .protected_branch_count, .default_branch, "maybe" ]
-    | @csv ' 
+    | @csv '
 
 echo ""
 echo "Repositories with no branch protection:"
 jq --raw-output <"$tmp_file" \
-    'select(.default_protected==false and .protections.enabled==false) 
+    'select(.default_protected==false and .protections.enabled==false)
     |  [.repository, .protected_branch_count, .default_branch, "nope" ]
-    | @csv ' 
+    | @csv '
 
 rm -rf "$tmpDir"

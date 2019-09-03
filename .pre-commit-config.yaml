@@ -2,15 +2,21 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v1.2.1-1
+    rev: v2.3.0
     hooks:
     -   id: trailing-whitespace
     -   id: end-of-file-fixer
     -   id: check-yaml
+    -   id: check-toml
+    -   id: check-json
     -   id: check-added-large-files
     -   id: check-ast
+    -   id: flake8
+        # we set flake8 line length to much bigger than black (88), as
+        # black sometimes exceeeds it's limit
+        args: [--max-line-length=131]
 -   repo: https://github.com/ambv/black
-    rev: stable
+    rev: 19.3b0
     hooks:
     - id: black
       language_version: python3.6

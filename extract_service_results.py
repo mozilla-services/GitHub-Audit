@@ -10,9 +10,7 @@ import csv  # noqa: E402
 import fileinput  # noqa: E402
 import json  # noqa: E402
 import logging  # noqa: E402
-import os  # noqa: E402
 import sys  # noqa: E402
-import time  # noqa: E402
 import urllib.parse  # noqa: E402
 
 # import tinydb  # noqa: E402
