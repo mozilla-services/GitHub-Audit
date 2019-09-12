@@ -47,6 +47,15 @@ $ poetry run {script}
 All scripts should respond to the ``--help`` option. Additional options
 are often described there.
 
+### Docker
+
+Using docker to produce CSV output:
+
+```
+$ docker build -t audit .
+$ docker run -e GITHUB_TOKEN -e GITHUB_ORG=mozilla-services audit
+```
+
 ### Checks via API
 
 These checks require a PAT token available. The PAT
