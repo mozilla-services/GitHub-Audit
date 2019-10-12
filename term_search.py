@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
     Search for a term in the code of an org or repo, display any hits
 """

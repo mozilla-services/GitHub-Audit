@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
     Report on branches that don't match protection guidelines from local
     data.

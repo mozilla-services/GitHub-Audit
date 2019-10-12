@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
     join the service name with the score for the repositories it uses
     and output as csv
