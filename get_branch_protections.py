@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
     Gather & locally cache data needed to determing compliance with branch
     protection guidelines
@@ -360,6 +360,7 @@ def harvest_repo(repo):
     name = repo["name"]
     owner = repo["owner"]
     default_branch = repo["default_branch"]
+    logger.debug(f"{full_name} ({default_branch}) started")
     protected_count = len(
         list(
             ag_get_all(
