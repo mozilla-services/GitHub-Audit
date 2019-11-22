@@ -5,21 +5,29 @@
 CACHE_DIR := .cache
 
 SERVICE_ORGS := \
+	Mozilla-Games \
+	MozillaReality \
+	MozillaSecurity \
+	iodide-project \
 	mozilla \
 	mozilla-bteam \
 	mozilla-conduit \
+	mozilla-extensions \
 	mozilla-frontend-infra \
 	mozilla-mobile \
-	mozilla-mobile-skunkworks \
+	mozilla-platform-ops \
 	mozilla-releng \
 	mozilla-services \
+	mozilla-standards \
 	mozilla-tw \
+	nss-dev \
 	taskcluster \
+
 
 OTHER_ORGS := \
 	mozilla-b2g \
 	mozilla-partners \
-	mozilla-platform-ops \
+
 
 SERVICE_DBS := $(SERVICE_ORGS:=.db.json)
 OTHER_DBS := $(OTHER_ORGS:=.db.json)
