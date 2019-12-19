@@ -141,13 +141,17 @@ def ag_call_with_rc(
         # TODO: do something better, like switch to using id's
         # for now, act like nothing is there
         body = doc.get("body", [])
-    elif rc == 404 and rc not in expected_rc:
-        logger.debug("No longer available or access denied: {}".format(url))
+    elif rc in (403, 404) and rc not in expected_rc:
+        # as of 2019-12-10, we seem to get 403's more often. Treat same
+        # as 404.
+        logger.debug(
+            "No longer available or access denied: code {} for {}".format(rc, url)
+        )
         # TODO: Figure out what to do here. Maybe it's just that message, but
         # maybe need to delete from DB before next run
         body = doc.get("body", [])
         # don't throw on this one
-        expected_rc.append(404)
+        expected_rc.append(rc)
     logger.debug("{} for {}".format(rc, url))
     if (not no_cache) and new_only and last_table is not None:
         h = {k.lower(): v for k, v in gh.getheaders()}
@@ -159,14 +163,17 @@ def ag_call_with_rc(
 
     # Ignore 204s here -- they come up for many "legit" reasons, such as
     # repositories with no code.
-    if rc not in expected_rc + [204]:
+    # Ditto for 304s -- if nothing's changed, nothing to complain about
+    if rc not in expected_rc + [204, 304]:
         if DEBUG:
             import pudb
 
             pudb.set_trace()  # noqa: E702
         else:
             logger.error("{} for {}".format(rc, url))
-            raise AG_Exception
+            # we don't want to raise AG_Exception here, as this func is
+            # protrected by a backoff on AG_Exception.
+            raise ValueError
     return rc, body
 
 
@@ -228,41 +235,9 @@ def get_github_client():
     return gh
 
 
-def ratelimit_dict():
-    #  return gh.ratelimit_remaining
-    body = ag_call(gh.rate_limit.get, no_cache=True)
-    return body
-
-
 def ratelimit_remaining():
-    body = ratelimit_dict()
-    return body["resources"]["core"]["remaining"]
-
-
-def wait_for_ratelimit(min_karma=25, msg=None):
-    while gh:
-        rc, payload = ag_call_with_rc(gh.rate_limit.get, no_cache=True)
-        calls_remaining = payload["resources"]["core"]["remaining"]
-        if calls_remaining < min_karma:
-            core = payload["resources"]["core"]
-            now = time.time()
-            nap = max(core["reset"] - now, 3.0)
-            if nap > 3500:
-                status = "FAIL"
-            else:
-                status = "pass"
-            logger.error(
-                f"{status} time calc: remaining: {calls_remaining}, karma: {min_karma}"
-            )
-            logger.error(
-                f"               reset: {core['reset']}, now: {now}, nap: {nap}"
-            )
-            logger.info("napping for %s seconds", nap)
-            if msg:
-                logger.info(msg)
-            time.sleep(nap)
-        else:
-            break
+    # just discovered this code is built into agithub.GitHub as of v2.2
+    return gh.client.ratelimit_seconds_remaining()
 
 
 logger = logging.getLogger(__name__)
@@ -334,15 +309,19 @@ class DeferredRetryQueue:
             needs_retry = []
             for r in remaining:
                 now = time.time()
-                not_before = r["last_time"] + 5 * retry
+                # for tiny orgs, need to wait significant time,
+                # otherwise retrys run out before data ready
+                not_before = r["last_time"] + (30 * retry)
                 if not_before > now:
                     nap_seconds = int(not_before - now) + 1
-                    logger.info(f"waiting {nap_seconds:d} before retry")
+                    url = r["method"]
+                    logger.info(f"waiting {nap_seconds:d} before retry on {url}")
                     time.sleep(int(not_before - now) + 1)
                 rc, _ = ag_call_with_rc(r["method"], expected_rc=[200, 202])
                 if rc in self.retry_codes:
                     # still not ready
                     if retry < r["max_retries"]:
+                        r["last_time"] = now
                         needs_retry.append(r)
                     else:
                         # put back on queue, since not finished
@@ -448,11 +427,10 @@ def harvest_org(org_name):
     def repo_fetcher():
         logger.debug("Using API for repos")
         for repo in ag_get_all(gh.orgs[org_name].repos.get, no_cache=True):
-            # TODO: not sure yieldingj correct 'repo' here
+            # TODO: not sure yielding correct 'repo' here
             # hack - we can't cache on get_all, so redo repo query here
             ag_call(gh.repos[repo["full_name"]].get)
             yield repo
-            wait_for_ratelimit()
 
     logger.debug("Working on org '%s'", org_name)
     org_data = {}
@@ -510,7 +488,6 @@ def process_orgs(args=None, collected_as=None):
             db = db_setup(org)
             # global branch_results
             # branch_results = db.table('branch_results')
-            # wait_for_ratelimit()
             if args.repo:
                 logger.info("Only processing repo %s", args.repo)
                 repo = ag_call(gh.repos[org][args.repo].get)
@@ -539,9 +516,9 @@ def main(driver=None):
     args = parse_args()
     global gh
     gh = get_github_client()
-    wait_for_ratelimit()
     body = ag_call(gh.user.get)
-    collected_as = body["login"]
+    # occasionally see a degenerate body, so handle that case
+    collected_as = body.get("login") if isinstance(body, dict) else str(body)
     logger.info("Running as {}".format(collected_as))
     data = process_orgs(args, collected_as=collected_as)
     results = {"collected_as": collected_as, "collected_at": time.time()}
@@ -577,6 +554,13 @@ if __name__ == "__main__":
     )
     # setup backoff logging
     logging.getLogger("backoff").addHandler(logging.StreamHandler())
+
+    # go to debug on agithub, so we can get a sense of any backoff
+    # action
+    agithub_logger = logging.getLogger("agithub")
+    agithub_logger.addHandler(logging.StreamHandler())
+    agithub_logger.setLevel(logging.DEBUG)
+
     try:
         main()
     except KeyboardInterrupt:
