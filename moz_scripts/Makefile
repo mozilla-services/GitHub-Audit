@@ -122,13 +122,13 @@ s3_upload:
 		s3_dir=$$(ls -dt /tmp/$${USER}-GitHub-Audit-S3-* | head -1) && \
 		pushd $$s3_dir && \
 		for f in *db.json; do \
-		    aws --profile cloudservices-aws-stage s3 cp $$f s3://foxsec-metrics/github/raw/ ; \
+		    aws --profile cloudservices-aws-stage s3 cp --quiet $$f s3://foxsec-metrics/github/raw/ ; \
 		done && \
 		for f in *db.arr.json; do \
-		    aws --profile cloudservices-aws-stage s3 cp $$f s3://foxsec-metrics/github/array_json/ ; \
+		    aws --profile cloudservices-aws-stage s3 cp --quiet $$f s3://foxsec-metrics/github/array_json/ ; \
 		done && \
 		for f in *db.obj.json; do \
-		    aws --profile cloudservices-aws-stage s3 cp $$f s3://foxsec-metrics/github/object_json/ ; \
+		    aws --profile cloudservices-aws-stage s3 cp --quiet $$f s3://foxsec-metrics/github/object_json/ ; \
 		done && \
 		true \
 		'

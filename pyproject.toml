@@ -7,7 +7,7 @@ license = "MPL-2.0"
 
 [tool.poetry.dependencies]
 python = "^3.6"
-agithub = "^2.1"
+agithub = "^2.2"
 tinydb = "^3.9"
 PyYAML = "^3.12"
 backoff = "^1.6"
@@ -18,7 +18,7 @@ pudb = "^2018.1"
 # Default from https://github.com/ambv/black/blob/master/pyproject.toml
 [tool.black]
 line-length = 88
-py36 = true
+target-version = ['py36',]
 include = '\.pyi?$'
 exclude = '''
 /(
