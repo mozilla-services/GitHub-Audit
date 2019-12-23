@@ -125,6 +125,12 @@ def ag_call_with_rc(
     if expected_rc is None:
         expected_rc = [200, 304]
     rc, body = retry_call(func, *args, **kwargs)
+    # we should retry on any sort of server error, assuming it will
+    # clear on retry
+    if 500 <= rc <= 599:
+        logger.error("Retrying {} for {}".format(rc, url))
+        raise AG_Exception
+
     # If we have new information, we want to use it (and store it unless
     # no_cache is true)
     # If we are told our existing info is ok, or there's an error, use the
