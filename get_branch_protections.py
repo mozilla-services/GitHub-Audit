@@ -243,7 +243,7 @@ def get_github_client():
 
 def ratelimit_remaining():
     # just discovered this code is built into agithub.GitHub as of v2.2
-    return gh.client.ratelimit_seconds_remaining()
+    return gh.client.ratelimit_remaining()
 
 
 logger = logging.getLogger(__name__)
