@@ -14,6 +14,7 @@ SERVICE_ORGS := \
 	mozilla-conduit \
 	mozilla-extensions \
 	mozilla-frontend-infra \
+	mozilla-l10n \
 	mozilla-lockwise \
 	mozilla-mobile \
 	mozilla-platform-ops \
