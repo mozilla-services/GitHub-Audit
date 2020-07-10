@@ -8,6 +8,7 @@ SERVICE_ORGS := \
 	Mozilla-Games \
 	MozillaReality \
 	MozillaSecurity \
+	firefox-devtools \
 	iodide-project \
 	mozilla \
 	mozilla-bteam \
