@@ -243,7 +243,7 @@ def get_github_client():
 
 def ratelimit_remaining():
     # just discovered this code is built into agithub.GitHub as of v2.2
-    return gh.client.ratelimit_seconds_remaining()
+    return gh.client.ratelimit_remaining()
 
 
 logger = logging.getLogger(__name__)
@@ -346,6 +346,9 @@ def harvest_repo(repo):
     owner = repo["owner"]
     default_branch = repo["default_branch"]
     logger.debug(f"{full_name} ({default_branch}) started")
+    # if naive method (get all branches) resultes in too much data, then
+    # we could only gather info on branches that have some level of
+    # protection.
     protected_count = len(
         list(
             ag_get_all(
@@ -360,50 +363,58 @@ def harvest_repo(repo):
         "protected_branch_count": protected_count,
     }
     # if repo is empty, branch retrieval will fail with 404
-    try:
-        branch = ag_call(gh.repos[full_name].branches[default_branch].get)
-        # Yechity
-        # branches are almost always updated, since they contain the latest
-        # commit information. However, branch protection data may not be
-        # updated, and we want to keep those values from last time.
-        # Which means we always have to read the old record, and use the values
-        # from there - without overwriting the current data.
-        # TODO: normalize to not aggregating data
-        # no changes since last time
-        logger.debug("Getting payload from db")
-        record = None  # branch_results.get(tinydb.where('repo') == full_name)
-        if branch and record:
-            fresh_details = details
-            details = record.get("branch", {})
-            details.update(fresh_details)
-        # always look deeper
-        logger.debug(
-            "Raw data for %s: %s",
-            default_branch,
-            json.dumps(branch, indent=2, cls=BytesEncoder),
-        )
-        protection = ag_call(
-            gh.repos[full_name].branches[default_branch].protection.get,
-            expected_rc=[200, 304, 404],
-        )
-        logger.debug(
-            "Protection data for %s: %s",
-            default_branch,
-            json.dumps(protection, indent=2, cls=BytesEncoder),
-        )
-        signatures = ag_call(
-            gh.repos[full_name]
-            .branches[default_branch]
-            .protection.required_signatures.get,
-            headers={"Accept": "application/vnd.github" ".zzzax-preview+json"},
-            expected_rc=[200, 304, 404],
-        )
-        logger.debug(
-            "Signature data for %s: %s",
-            default_branch,
-            json.dumps(signatures, indent=2, cls=BytesEncoder),
-        )
-        # just get into database. No other action for now
+    for branch in ag_get_all(gh.repos[full_name].branches.get, no_cache=True):
+        branch_name = branch["name"]
+        try:
+            # Yechity
+            # branches are almost always updated, since they contain the latest
+            # commit information. However, branch protection data may not be
+            # updated, and we want to keep those values from last time.
+            # Which means we always have to read the old record, and use the values
+            # from there - without overwriting the current data.
+            # TODO: normalize to not aggregating data
+            # no changes since last time
+            logger.debug("Getting payload from db")
+            record = None  # branch_results.get(tinydb.where('repo') == full_name)
+            if branch and record:
+                fresh_details = details
+                details = record.get("branch", {})
+                details.update(fresh_details)
+            # always look deeper
+            logger.debug(
+                "Raw data for %s: %s",
+                branch_name,
+                json.dumps(branch, indent=2, cls=BytesEncoder),
+            )
+            protection = ag_call(
+                gh.repos[full_name].branches[branch_name].protection.get,
+                expected_rc=[200, 304, 404],
+            )
+            logger.debug(
+                "Protection data for %s: %s",
+                branch,
+                json.dumps(protection, indent=2, cls=BytesEncoder),
+            )
+            signatures = ag_call(
+                gh.repos[full_name]
+                .branches[branch_name]
+                .protection.required_signatures.get,
+                headers={"Accept": "application/vnd.github" ".zzzax-preview+json"},
+                expected_rc=[200, 304, 404],
+            )
+            logger.debug(
+                "Signature data for %s: %s",
+                branch,
+                json.dumps(signatures, indent=2, cls=BytesEncoder),
+            )
+        # except AG_Exception:
+        except Exception as e:
+            # Assume no branch so add no data
+            logger.info(
+                "Branch data failure: %s/%s: %s", full_name, branch_name, repr(e)
+            )
+            pass
+        # just get hooks & commit activity into database. No other action for now
         hooks = list(ag_get_all(gh.repos[full_name].hooks.get, no_cache=True))
         for hook in hooks:
             ag_call(gh.repos[full_name].hooks[hook["id"]].get)
@@ -423,9 +434,6 @@ def harvest_repo(repo):
             details.update({"protections": protection})
         if signatures:
             details.update({"signatures": signatures})
-    except AG_Exception:
-        # Assume no branch so add no data
-        pass
     return {repo["full_name"]: details}
 
 
@@ -526,9 +534,7 @@ def main(driver=None):
     # occasionally see a degenerate body, so handle that case
     collected_as = body.get("login") if isinstance(body, dict) else str(body)
     logger.info("Running as {}".format(collected_as))
-    data = process_orgs(args, collected_as=collected_as)
-    results = {"collected_as": collected_as, "collected_at": time.time()}
-    results.update(data)
+    process_orgs(args, collected_as=collected_as)
 
 
 def parse_args():
