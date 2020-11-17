@@ -4,28 +4,15 @@
 
 CACHE_DIR := .cache
 
+## DO NOT MERGE start
 SERVICE_ORGS := \
-	Mozilla-Games \
-	MozillaReality \
-	MozillaSecurity \
-	firefox-devtools \
 	iodide-project \
-	mozilla \
-	mozilla-bteam \
-	mozilla-conduit \
-	mozilla-extensions \
-	mozilla-frontend-infra \
-	mozilla-l10n \
-	mozilla-lockwise \
-	mozilla-mobile \
-	mozilla-platform-ops \
-	mozilla-releng \
-	mozilla-services \
-	mozilla-standards \
-	mozilla-tw \
-	nss-dev \
-	taskcluster \
+	firefox-devtools \
+	MozillaSecurity \
+	MozillaReality \
+	Mozilla-Games \
 
+## DO NOT MERGE end
 
 OTHER_ORGS := \
 	mozilla-b2g \
@@ -125,13 +112,13 @@ s3_upload:
 		s3_dir=$$(ls -dt /tmp/$${USER}-GitHub-Audit-S3-* | head -1) && \
 		pushd $$s3_dir && \
 		for f in *db.json; do \
-		    aws --profile cloudservices-aws-stage s3 cp --quiet $$f s3://foxsec-metrics/github/raw/ ; \
+		    aws s3 cp --quiet $$f s3://foxsec-metrics/github/raw/ ; \
 		done && \
 		for f in *db.arr.json; do \
-		    aws --profile cloudservices-aws-stage s3 cp --quiet $$f s3://foxsec-metrics/github/array_json/ ; \
+		    aws s3 cp --quiet $$f s3://foxsec-metrics/github/array_json/ ; \
 		done && \
 		for f in *db.obj.json; do \
-		    aws --profile cloudservices-aws-stage s3 cp --quiet $$f s3://foxsec-metrics/github/object_json/ ; \
+		    aws s3 cp --quiet $$f s3://foxsec-metrics/github/object_json/ ; \
 		done && \
 		true \
 		'
