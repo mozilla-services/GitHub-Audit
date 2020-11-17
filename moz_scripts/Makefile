@@ -4,15 +4,28 @@
 
 CACHE_DIR := .cache
 
-## DO NOT MERGE start
 SERVICE_ORGS := \
-	iodide-project \
-	firefox-devtools \
-	MozillaSecurity \
-	MozillaReality \
 	Mozilla-Games \
+	MozillaReality \
+	MozillaSecurity \
+	firefox-devtools \
+	iodide-project \
+	mozilla \
+	mozilla-bteam \
+	mozilla-conduit \
+	mozilla-extensions \
+	mozilla-frontend-infra \
+	mozilla-l10n \
+	mozilla-lockwise \
+	mozilla-mobile \
+	mozilla-platform-ops \
+	mozilla-releng \
+	mozilla-services \
+	mozilla-standards \
+	mozilla-tw \
+	nss-dev \
+	taskcluster \
 
-## DO NOT MERGE end
 
 OTHER_ORGS := \
 	mozilla-b2g \
