@@ -253,8 +253,8 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 
 [metadata]
 lock-version = "1.1"
-python-versions = ">=3.6.1,<3.7"
-content-hash = "9304dc12829b197ac5850bd147a2ecf6ba216bba9cfca65b8a41e1fb0522e84e"
+python-versions = ">=3.6.1"
+content-hash = "9749f4a5a6a5076910f9ea9755d4e486c7aa8808b6a373365f6f42a18724b4af"
 
 [metadata.files]
 agithub = [

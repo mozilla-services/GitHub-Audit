@@ -7,7 +7,7 @@ license = "MPL-2.0"
 
 [tool.poetry.dependencies]
 # pin to 3.6
-python = ">=3.6.1,<3.7"
+python = ">=3.6.1"
 agithub = "^2.2"
 tinydb = "^3.9"
 PyYAML = "^3.12"
