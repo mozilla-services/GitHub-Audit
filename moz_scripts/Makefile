@@ -125,13 +125,31 @@ s3_upload:
 		s3_dir=$$(ls -dt /tmp/$${USER}-GitHub-Audit-S3-* | head -1) && \
 		pushd $$s3_dir && \
 		for f in *db.json; do \
-		    aws --profile cloudservices-aws-stage s3 cp --quiet $$f s3://foxsec-metrics/github/raw/ ; \
+		    aws s3 cp --quiet $$f s3://foxsec-metrics/github/raw/ ; \
+		    aws s3api put-object-acl \
+			    --bucket foxsec-metrics \
+			    --key github/raw/$$f \
+			    --grant-full-control \
+			    id="d3de8b812947812228174af052932d5e8025e2d426c03bd577e67dc581a2c946" \
+			    || echo "permission change for $$f in github/raw failed: $?" ; \
 		done && \
 		for f in *db.arr.json; do \
-		    aws --profile cloudservices-aws-stage s3 cp --quiet $$f s3://foxsec-metrics/github/array_json/ ; \
+		    aws s3 cp --quiet $$f s3://foxsec-metrics/github/array_json/ ; \
+		    aws s3api put-object-acl \
+			    --bucket foxsec-metrics \
+			    --key github/array_json/$$f \
+			    --grant-full-control \
+			    id="d3de8b812947812228174af052932d5e8025e2d426c03bd577e67dc581a2c946" \
+			    || echo "permission change for $$f in github/array_json failed: $?" ; \
 		done && \
 		for f in *db.obj.json; do \
-		    aws --profile cloudservices-aws-stage s3 cp --quiet $$f s3://foxsec-metrics/github/object_json/ ; \
+		    aws s3 cp --quiet $$f s3://foxsec-metrics/github/object_json/ ; \
+		    aws s3api put-object-acl \
+			    --bucket foxsec-metrics \
+			    --key github/object_json/$$f \
+			    --grant-full-control \
+			    id="d3de8b812947812228174af052932d5e8025e2d426c03bd577e67dc581a2c946" \
+			    || echo "permission change for $$f in github/object_json failed: $?" ; \
 		done && \
 		true \
 		'

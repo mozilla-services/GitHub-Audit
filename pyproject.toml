@@ -6,7 +6,8 @@ authors = ["Hal Wine <hwine@mozilla.com>"]
 license = "MPL-2.0"
 
 [tool.poetry.dependencies]
-python = "^3.6"
+# pin to 3.6
+python = ">=3.6.1"
 agithub = "^2.2"
 tinydb = "^3.9"
 PyYAML = "^3.12"
@@ -15,6 +16,7 @@ backoff = "^1.6"
 [tool.poetry.dev-dependencies]
 pudb = "^2018.1"
 
+pre-commit = "2.0"
 # Default from https://github.com/ambv/black/blob/master/pyproject.toml
 [tool.black]
 line-length = 88
