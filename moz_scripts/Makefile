@@ -58,8 +58,12 @@ help:
 	@echo "  report      build the per-service reports"
 	@echo "  consolidate gather all per-service reports for spreadsheet import"
 	@echo "              into consolidate.csv"
-	@echo "  preview_new_issues     show what open_protected_issues would do"
-	@echo "  open_protected_issues  open GitHub issues on repositories which"
+	@echo "  preview_never_protected    show what open_protected_issues would do"
+	@echo "  open_never_protected   open GitHub issues on repositories which"
+	@echo "                         do not have branch protection enabled"
+	@echo ""
+	@echo "  preview_regressed      show what open_protected_issues would do"
+	@echo "  open_regressed         open GitHub issues on repositories which"
 	@echo "                         do not have branch protection enabled"
 	@echo ""
 	@echo "  get_others  obtain all data for non-service orgs"
@@ -97,11 +101,17 @@ consolidate:
 	@echo "You must manually copy the latest report CSV to consolidated.csv"
 	@false
 
-preview_new_issues: consolidated.csv
-	moz_scripts/open_issues.py               $$(grep '/' consolidated.csv | cut -d, -f1,2 --output-delimiter '/')
+preview_never_protected: consolidated.csv
+	moz_scripts/open_issues.py --id 1               $$(grep '/' consolidated.csv | cut -d, -f1,2 --output-delimiter '/')
 
-open_protected_issues: consolidated.csv
-	moz_scripts/open_issues.py --open-issues $$(grep '/' consolidated.csv | cut -d, -f1,2 --output-delimiter '/')
+open_never_protected: consolidated.csv
+	moz_scripts/open_issues.py --id 1 --open-issues $$(grep '/' consolidated.csv | cut -d, -f1,2 --output-delimiter '/')
+
+preview_regressed: consolidated.csv
+	moz_scripts/open_issues.py --id 2               $$(tail -n +2 consolidated.csv | cut -d, -f2,3 --output-delimiter '/')
+
+open_regressed: consolidated.csv
+	moz_scripts/open_issues.py --id 2 --open-issues $$(tail -n +2 consolidated.csv | cut -d, -f2,3 --output-delimiter '/')
 
 s3_prep:
 	bash -c ' \
