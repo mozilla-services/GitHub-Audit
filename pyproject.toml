@@ -10,7 +10,7 @@ license = "MPL-2.0"
 python = ">=3.6.1"
 agithub = "^2.2"
 tinydb = "^3.9"
-PyYAML = "^3.12"
+PyYAML = "^5.4"
 backoff = "^1.6"
 
 [tool.poetry.dev-dependencies]
